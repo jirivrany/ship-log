@@ -50,8 +50,11 @@ def parse_fit_metadata(path: str, filename: str) -> FitMeta:
         st = fields.get("start_time")
         if st:
             start_time = _ensure_utc(st)
-            if date is None:
-                date = start_time.strftime("%Y-%m-%d")
+            # Date derived from GPS timestamp beats the filename — Strava/Garmin
+            # sometimes names the file with the wrong date. We'll convert to
+            # local time once tz_name is known; for now store as UTC date as
+            # a safe default and overwrite after timezone is resolved.
+            date = start_time.strftime("%Y-%m-%d")
         dist_m = fields.get("total_distance")
         if dist_m:
             total_distance_nm = round(dist_m / 1852.0, 2)
@@ -78,6 +81,12 @@ def parse_fit_metadata(path: str, filename: str) -> FitMeta:
                 if found:
                     tz_name = found
                 break
+
+    # Re-derive date in local timezone so a leg starting at e.g. 23:30 UTC
+    # gets the correct local calendar date, not the UTC date.
+    if start_time and tz_name != "UTC":
+        from zoneinfo import ZoneInfo
+        date = start_time.astimezone(ZoneInfo(tz_name)).strftime("%Y-%m-%d")
 
     return FitMeta(
         date=date or "",

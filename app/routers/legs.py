@@ -145,7 +145,7 @@ def leg_detail(leg_id: int, request: Request, session: Session = Depends(get_ses
         local_time = e.timestamp.astimezone(tz).strftime("%H:%M")
         local_entries.append((e, local_time))
 
-    track_geojson = _load_track_geojson(leg.fit_path) if leg.fit_path else []
+    track_points = _load_track_points(leg.fit_path) if leg.fit_path else []
     stats = _compute_leg_stats(entries)
 
     return templates.TemplateResponse("leg.html", {
@@ -153,7 +153,7 @@ def leg_detail(leg_id: int, request: Request, session: Session = Depends(get_ses
         "leg": leg,
         "voyage": leg.voyage,
         "local_entries": local_entries,
-        "track_geojson": track_geojson,
+        "track_points": track_points,
         "tz_name": leg.timezone,
         "stats": stats,
     })
@@ -183,6 +183,84 @@ def _compute_leg_stats(entries: list) -> dict:
     }
 
 
+@router.post("/legs/{leg_id}/entries", response_class=HTMLResponse)
+def add_manual_entry(
+    leg_id: int,
+    request: Request,
+    ts: str = Form(...),
+    lat: float = Form(...),
+    lon: float = Form(...),
+    course: float = Form(None),
+    speed: float = Form(None),
+    dist_nm: float = Form(None),
+    temp: float = Form(None),
+    session: Session = Depends(get_session),
+):
+    leg = session.get(Leg, leg_id)
+    if not leg:
+        return HTMLResponse("Not found", status_code=404)
+
+    from datetime import datetime, timezone as tz_mod
+    from app.models import EntrySource
+    timestamp = datetime.fromisoformat(ts)
+    if timestamp.tzinfo is None:
+        timestamp = timestamp.replace(tzinfo=tz_mod.utc)
+    # Store as naive UTC (consistent with how other entries are stored)
+    timestamp_naive = timestamp.astimezone(tz_mod.utc).replace(tzinfo=None)
+
+    # Inherit propulsion/wind from the nearest preceding entry
+    all_entries = session.exec(
+        select(LogEntry).where(LogEntry.leg_id == leg_id).order_by(LogEntry.timestamp)
+    ).all()
+
+    preceding = [e for e in all_entries if e.timestamp <= timestamp_naive]
+    inherit = preceding[-1] if preceding else (all_entries[0] if all_entries else None)
+
+    entry = LogEntry(
+        leg_id=leg_id,
+        timestamp=timestamp_naive,
+        lat=lat,
+        lon=lon,
+        source=EntrySource.manual,
+        course=course,
+        speed=speed,
+        log_value=dist_nm,
+        air_temperature=temp,
+        propulsion=inherit.propulsion if inherit else None,
+        wind_direction=inherit.wind_direction if inherit else None,
+        wind_force=inherit.wind_force if inherit else None,
+    )
+    session.add(entry)
+    session.commit()
+    session.refresh(entry)
+
+    try:
+        tz = ZoneInfo(leg.timezone)
+    except Exception:
+        tz = ZoneInfo("UTC")
+    local_time = entry.timestamp.replace(tzinfo=tz_mod.utc).astimezone(tz).strftime("%H:%M")
+
+    # Find the entry that should follow this one (for client-side DOM insertion)
+    all_entries = session.exec(
+        select(LogEntry).where(LogEntry.leg_id == leg_id).order_by(LogEntry.timestamp)
+    ).all()
+    next_entry = next((e for e in all_entries if e.timestamp > entry.timestamp), None)
+    next_id = next_entry.id if next_entry else None
+
+    row_html = templates.TemplateResponse(
+        "partials/entry_row.html",
+        {"request": request, "entry": entry, "local_time": local_time},
+    ).body.decode()
+
+    return HTMLResponse(
+        row_html,
+        headers={
+            "X-Insert-Before": str(next_id) if next_id else "",
+            "X-Entry-Id": str(entry.id),
+        },
+    )
+
+
 @router.get("/legs/{leg_id}/summary", response_class=HTMLResponse)
 def leg_summary(leg_id: int, request: Request, session: Session = Depends(get_session)):
     entries = session.exec(
@@ -205,13 +283,14 @@ def delete_leg(leg_id: int, session: Session = Depends(get_session)):
     return HTMLResponse("")
 
 
-def _load_track_geojson(fit_path: str) -> list:
-    """Return [[lat, lon], ...] sampled every 30s for Leaflet polyline."""
+def _load_track_points(fit_path: str) -> list[dict]:
+    """Return sampled track points with full metadata for map rendering and manual entry creation."""
     try:
         import fitparse
+        import math
         SC = 180.0 / (2**31)
         fit = fitparse.FitFile(fit_path)
-        points = []
+        raw = []
         last_ts = None
         for msg in fit.get_messages("record"):
             fields = {f.name: f.value for f in msg.fields if f.value is not None}
@@ -220,9 +299,41 @@ def _load_track_geojson(fit_path: str) -> list:
             lon_sc = fields.get("position_long")
             if ts is None or lat_sc is None or lon_sc is None:
                 continue
+            if ts.tzinfo is None:
+                from datetime import timezone
+                ts = ts.replace(tzinfo=timezone.utc)
             if last_ts is None or (ts - last_ts).total_seconds() >= 30:
-                points.append([lat_sc * SC, lon_sc * SC])
+                speed_ms = fields.get("enhanced_speed") or fields.get("speed") or 0.0
+                raw.append({
+                    "ts": ts,
+                    "lat": lat_sc * SC,
+                    "lon": lon_sc * SC,
+                    "speed": round(speed_ms * 1.94384, 2),
+                    "temp": fields.get("temperature"),
+                    "dist_m": fields.get("distance") or 0.0,
+                })
                 last_ts = ts
-        return points
+
+        # Compute COG as bearing to next point (same logic as fit_track.py)
+        def _bearing(lat1, lon1, lat2, lon2):
+            phi1, phi2 = math.radians(lat1), math.radians(lat2)
+            dl = math.radians(lon2 - lon1)
+            x = math.sin(dl) * math.cos(phi2)
+            y = math.cos(phi1) * math.sin(phi2) - math.sin(phi1) * math.cos(phi2) * math.cos(dl)
+            return round((math.degrees(math.atan2(x, y)) + 360) % 360, 1)
+
+        result = []
+        for i, pt in enumerate(raw):
+            cog = _bearing(pt["lat"], pt["lon"], raw[i+1]["lat"], raw[i+1]["lon"]) if i + 1 < len(raw) else (result[-1]["cog"] if result else None)
+            result.append({
+                "lat": pt["lat"],
+                "lon": pt["lon"],
+                "ts": pt["ts"].isoformat(),
+                "speed": pt["speed"],
+                "cog": cog,
+                "temp": pt["temp"],
+                "dist_nm": round(pt["dist_m"] / 1852.0, 3),
+            })
+        return result
     except Exception:
         return []

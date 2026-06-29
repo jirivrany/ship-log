@@ -54,7 +54,7 @@
 
 {% block scripts %}
 <script>
-  const trackPoints = {{ track_geojson | tojson }};
+  const trackPoints = {{ track_points | tojson }};
   const logEntries = [
     {% for entry, local_time in local_entries %}
     {
@@ -75,9 +75,89 @@
     maxZoom: 18,
   }).addTo(map);
 
-  if (trackPoints.length > 0) {
-    const polyline = L.polyline(trackPoints, { color: '#2563eb', weight: 2.5, opacity: 0.8 }).addTo(map);
+  const latLons = trackPoints.map(p => [p.lat, p.lon]);
+  if (latLons.length > 0) {
+    const polyline = L.polyline(latLons, { color: '#2563eb', weight: 4, opacity: 0.8 }).addTo(map);
     map.fitBounds(polyline.getBounds(), { padding: [20, 20] });
+
+    polyline.on('click', function(ev) {
+      L.DomEvent.stopPropagation(ev);
+      const click = ev.latlng;
+
+      // Find nearest track point to click
+      let best = null, bestDist = Infinity;
+      for (const pt of trackPoints) {
+        const d = Math.hypot(pt.lat - click.lat, pt.lon - click.lng);
+        if (d < bestDist) { bestDist = d; best = pt; }
+      }
+      if (!best) return;
+
+      // Show confirmation popup
+      const popup = L.popup()
+        .setLatLng([best.lat, best.lon])
+        .setContent(
+          `<strong>Add log entry here?</strong><br>` +
+          `${new Date(best.ts).toLocaleTimeString('cs-CZ', {hour:'2-digit', minute:'2-digit', timeZone:'{{ leg.timezone }}'})}<br>` +
+          `COG ${best.cog ?? '—'}° &nbsp; SOG ${best.speed} kn<br><br>` +
+          `<button onclick="addEntry(this)" ` +
+          `data-ts="${best.ts}" data-lat="${best.lat}" data-lon="${best.lon}" ` +
+          `data-cog="${best.cog ?? ''}" data-speed="${best.speed}" ` +
+          `data-dist="${best.dist_nm}" data-temp="${best.temp ?? ''}" ` +
+          `class="popup-delete-btn" style="background:#f0fdf4;border-color:#bbf7d0;color:#166534">` +
+          `Add entry</button>`
+        )
+        .openOn(map);
+    });
+  }
+
+  function addEntry(btn) {
+    const body = new FormData();
+    body.append('ts',       btn.dataset.ts);
+    body.append('lat',      btn.dataset.lat);
+    body.append('lon',      btn.dataset.lon);
+    body.append('course',   btn.dataset.cog);
+    body.append('speed',    btn.dataset.speed);
+    body.append('dist_nm',  btn.dataset.dist);
+    body.append('temp',     btn.dataset.temp);
+
+    map.closePopup();
+
+    fetch('/legs/{{ leg.id }}/entries', { method: 'POST', body })
+      .then(r => {
+        const beforeId = r.headers.get('X-Insert-Before');
+        const entryId  = r.headers.get('X-Entry-Id');
+        return r.text().then(html => ({ html, beforeId, entryId }));
+      })
+      .then(({ html, beforeId, entryId }) => {
+        // Insert table row
+        const tbody = document.getElementById('log-entries');
+        const tmp = document.createElement('table');
+        tmp.innerHTML = `<tbody>${html}</tbody>`;
+        const row = tmp.querySelector('tr');
+        if (!row) return;
+        if (beforeId) {
+          const sibling = document.getElementById('entry-' + beforeId);
+          sibling ? tbody.insertBefore(row, sibling) : tbody.appendChild(row);
+        } else {
+          tbody.appendChild(row);
+        }
+        htmx.process(row);
+
+        // Add map marker for the new entry
+        if (entryId) {
+          addMarker({
+            id: parseInt(entryId),
+            lat: parseFloat(btn.dataset.lat),
+            lon: parseFloat(btn.dataset.lon),
+            source: 'manual',
+            time: new Date(btn.dataset.ts).toLocaleTimeString('cs-CZ', {hour:'2-digit', minute:'2-digit', timeZone:'{{ leg.timezone }}'}),
+            cog: btn.dataset.cog ? parseFloat(btn.dataset.cog) : null,
+            sog: btn.dataset.speed ? parseFloat(btn.dataset.speed) : null,
+          });
+        }
+
+        htmx.trigger(document.body, 'propulsionChanged');
+      });
   }
 
   const sourceColors = {
@@ -87,7 +167,9 @@
     manual: '#d97706',
   };
 
-  logEntries.forEach(e => {
+  const markerRegistry = {};  // entry id → Leaflet marker
+
+  function addMarker(e) {
     const color = sourceColors[e.source] || '#6b7280';
     const marker = L.circleMarker([e.lat, e.lon], {
       radius: e.source === 'lap' ? 8 : 6,
@@ -103,19 +185,28 @@
     marker.bindPopup(
       `<strong>${e.time}</strong> <span class="popup-source">${e.source.replace('_', ' ')}</span><br>` +
       `COG ${cogStr} &nbsp; SOG ${sogStr}<br>` +
-      `<button onclick="deleteEntry(${e.id}, this)" class="popup-delete-btn">Delete entry</button>`
+      `<button onclick="deleteEntry(${e.id})" class="popup-delete-btn">Delete entry</button>`
     );
+    marker.on('contextmenu', ev => { L.DomEvent.preventDefault(ev); marker.openPopup(); });
+    markerRegistry[e.id] = marker;
+  }
 
-    marker.on('contextmenu', function(ev) {
-      L.DomEvent.preventDefault(ev);
-      marker.openPopup();
+  logEntries.forEach(addMarker);
+
+  function deleteEntry(id) {
+    fetch(`/entries/${id}`, { method: 'DELETE' }).then(r => {
+      if (!r.ok) return;
+      // Remove table row
+      const row = document.getElementById('entry-' + id);
+      if (row) row.remove();
+      // Remove map marker
+      if (markerRegistry[id]) {
+        map.removeLayer(markerRegistry[id]);
+        delete markerRegistry[id];
+      }
+      map.closePopup();
+      htmx.trigger(document.body, 'propulsionChanged');
     });
-  });
-
-  function deleteEntry(id, btn) {
-    if (!confirm('Remove this log entry?')) return;
-    fetch(`/entries/${id}`, { method: 'DELETE' })
-      .then(r => { if (r.ok) window.location.reload(); });
   }
 </script>
 {% endblock %}

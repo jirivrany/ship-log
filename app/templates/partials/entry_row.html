@@ -68,9 +68,6 @@
 
   <td>
     <button class="btn btn-sm btn-outline-danger px-2 py-0"
-            hx-delete="/entries/{{ entry.id }}"
-            hx-target="#entry-{{ entry.id }}"
-            hx-swap="outerHTML"
-            hx-confirm="Remove this log entry?">✕</button>
+            onclick="deleteEntry({{ entry.id }})">✕</button>
   </td>
 </tr>
