@@ -1,14 +1,13 @@
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse
-from fastapi.templating import Jinja2Templates
 from sqlmodel import Session
 from typing import Optional
 
 from app.database import get_session
 from app.models import LogEntry, PropulsionType
+from app.templates_env import templates
 
 router = APIRouter()
-templates = Jinja2Templates(directory="app/templates")
 
 FIELD_SETTERS = {
     "propulsion":           lambda e, v: setattr(e, "propulsion", PropulsionType(v) if v else None),

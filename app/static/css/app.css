@@ -1,10 +1,11 @@
-/* Map */
-#map {
+/* Maps */
+#map, #voyage-map {
   height: 420px;
   border-radius: 8px;
   border: 1px solid #dee2e6;
   margin-bottom: 24px;
 }
+#voyage-map { height: 480px; }
 
 /* Log table — source color left-border */
 .log-row--lap td:first-child           { border-left: 3px solid #7c3aed; }
@@ -48,3 +49,19 @@
 
 /* Voyage card hover */
 .voyage-card:hover { border-color: #0d6efd; box-shadow: 0 2px 8px rgba(13,110,253,.1); }
+
+/* Editable leg name in heading */
+.leg-name-input {
+  font-size: inherit;
+  font-weight: inherit;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  padding: 0 2px;
+  min-width: 4ch;
+  width: auto;
+  color: inherit;
+  line-height: inherit;
+}
+.leg-name-input:hover { border-bottom-color: #dee2e6; }
+.leg-name-input:focus { outline: none; border-bottom-color: #0d6efd; background: #f8f9fa; border-radius: 3px 3px 0 0; }

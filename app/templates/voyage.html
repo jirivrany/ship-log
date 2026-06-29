@@ -7,7 +7,44 @@
   <a href="/voyages/{{ voyage.id }}/legs/new" class="btn btn-primary btn-sm">+ Add Leg</a>
 </div>
 <h1 class="h3">{{ voyage.name }}</h1>
-<p class="text-muted mb-4">{{ voyage.boat }}{% if voyage.registration_number %} · {{ voyage.registration_number }}{% endif %}</p>
+<p class="text-muted mb-1">{{ voyage.boat }}{% if voyage.registration_number %} · {{ voyage.registration_number }}{% endif %}</p>
+
+{% if voyage_stats.total_nm > 0 %}
+<div class="d-flex flex-wrap gap-4 mb-4">
+  <div>
+    <div class="text-muted small">Total</div>
+    <div class="fs-5 fw-bold">{{ voyage_stats.total_nm }} Nm</div>
+  </div>
+  {% if voyage_stats.motor_nm > 0 %}
+  <div>
+    <div class="text-muted small">Motor</div>
+    <div class="fs-5 fw-bold">{{ voyage_stats.motor_nm }} Nm</div>
+  </div>
+  {% endif %}
+  {% if voyage_stats.sail_nm > 0 %}
+  <div>
+    <div class="text-muted small">Sail</div>
+    <div class="fs-5 fw-bold">{{ voyage_stats.sail_nm }} Nm</div>
+  </div>
+  {% endif %}
+  {% if voyage_stats.both_nm > 0 %}
+  <div>
+    <div class="text-muted small">Motor + sail</div>
+    <div class="fs-5 fw-bold">{{ voyage_stats.both_nm }} Nm</div>
+  </div>
+  {% endif %}
+  <div class="border-start ps-4">
+    <div class="text-muted small">Legs</div>
+    <div class="fs-5 fw-bold">{{ legs | length }}</div>
+  </div>
+</div>
+{% else %}
+<div class="mb-4"></div>
+{% endif %}
+
+{% if legs %}
+<div id="voyage-map" class="mb-4"></div>
+{% endif %}
 
 <div class="row g-4">
 
@@ -17,11 +54,14 @@
     <div class="d-flex flex-column gap-2">
       {% for leg in legs %}
       {% set s = leg_stats[leg.id] %}
-      <div class="card px-3 py-3 d-flex flex-row align-items-center gap-3">
+      {% set leg_color = ['#2563eb','#dc2626','#059669','#d97706','#7c3aed','#0891b2','#be185d','#65a30d','#ea580c','#6366f1'][loop.index0 % 10] %}
+      <div class="card d-flex flex-row align-items-stretch gap-0 overflow-hidden">
+        <div style="width:5px;background:{{ leg_color }};flex-shrink:0"></div>
+        <div class="px-3 py-3 d-flex flex-row align-items-center gap-3 flex-grow-1">
         <a href="/legs/{{ leg.id }}" class="flex-grow-1 text-decoration-none text-dark">
           <div class="fw-semibold">{{ leg.from_port }} → {{ leg.to_port }}</div>
           <div class="text-muted small d-flex gap-3 mt-1">
-            <span>{{ leg.date }}</span>
+            <span>{{ leg.date | datetimeformat("%A") }} {{ leg.date }}</span>
             <span>{{ s.entry_count }} entries</span>
             {% if s.total_nm > 0 %}
             <span class="fw-medium text-dark">{{ s.total_nm }} Nm</span>
@@ -36,39 +76,11 @@
                 hx-confirm="Delete leg {{ leg.from_port }} → {{ leg.to_port }} and all its log entries?"
                 hx-target="closest .card"
                 hx-swap="outerHTML">Delete</button>
+        </div>
       </div>
       {% endfor %}
     </div>
 
-    {% if voyage_stats.total_nm > 0 %}
-    <div class="card p-3 mt-3">
-      <h3 class="h6 fw-semibold mb-3">Voyage totals</h3>
-      <div class="d-flex flex-wrap gap-4">
-        <div>
-          <div class="text-muted small">Total</div>
-          <div class="fs-5 fw-bold">{{ voyage_stats.total_nm }} Nm</div>
-        </div>
-        {% if voyage_stats.motor_nm > 0 %}
-        <div>
-          <div class="text-muted small">Motor</div>
-          <div class="fs-5 fw-bold">{{ voyage_stats.motor_nm }} Nm</div>
-        </div>
-        {% endif %}
-        {% if voyage_stats.sail_nm > 0 %}
-        <div>
-          <div class="text-muted small">Sail</div>
-          <div class="fs-5 fw-bold">{{ voyage_stats.sail_nm }} Nm</div>
-        </div>
-        {% endif %}
-        {% if voyage_stats.both_nm > 0 %}
-        <div>
-          <div class="text-muted small">Motor + sail</div>
-          <div class="fs-5 fw-bold">{{ voyage_stats.both_nm }} Nm</div>
-        </div>
-        {% endif %}
-      </div>
-    </div>
-    {% endif %}
 
     {% else %}
     <p class="text-muted">No legs yet. Add the first leg above.</p>
@@ -135,4 +147,52 @@
   </div>
 
 </div>
+{% endblock %}
+
+{% block scripts %}
+{% if legs %}
+<script>
+  const legTracks = {{ leg_tracks | tojson }};
+
+  const COLORS = [
+    '#2563eb','#dc2626','#059669','#d97706','#7c3aed',
+    '#0891b2','#be185d','#65a30d','#ea580c','#6366f1',
+  ];
+
+  const map = L.map('voyage-map');
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap contributors',
+    maxZoom: 18,
+  }).addTo(map);
+
+  const allLatLons = [];
+  {% for leg in legs %}
+  {%- set idx = loop.index0 %}
+  const pts{{ idx }} = legTracks[{{ leg.id }}] || [];
+  if (pts{{ idx }}.length > 1) {
+    L.polyline(pts{{ idx }}, {
+      color: COLORS[{{ idx }} % COLORS.length],
+      weight: 3,
+      opacity: 0.85,
+    }).bindTooltip('{{ leg.from_port }} → {{ leg.to_port }}', { sticky: true }).addTo(map);
+
+    const first{{ idx }} = pts{{ idx }}[0];
+    const last{{ idx }} = pts{{ idx }}[pts{{ idx }}.length - 1];
+
+    L.circleMarker(first{{ idx }}, { radius: 5, fillColor: COLORS[{{ idx }} % COLORS.length], color: '#fff', weight: 1.5, fillOpacity: 1 })
+      .bindPopup('<strong>{{ leg.from_port }}</strong><br><small>{{ leg.date }}</small>')
+      .addTo(map);
+    L.circleMarker(last{{ idx }}, { radius: 5, fillColor: COLORS[{{ idx }} % COLORS.length], color: '#333', weight: 1.5, fillOpacity: 1 })
+      .bindPopup('<strong>{{ leg.to_port }}</strong><br><small>{{ leg.date }}</small>')
+      .addTo(map);
+
+    pts{{ idx }}.forEach(p => allLatLons.push(p));
+  }
+  {% endfor %}
+
+  if (allLatLons.length > 0) {
+    map.fitBounds(L.latLngBounds(allLatLons), { padding: [20, 20] });
+  }
+</script>
+{% endif %}
 {% endblock %}

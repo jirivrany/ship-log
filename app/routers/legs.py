@@ -5,7 +5,6 @@ from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse
-from fastapi.templating import Jinja2Templates
 from sqlmodel import Session, select
 
 from app.database import get_session
@@ -13,9 +12,9 @@ from app.models import Leg, LogEntry, PropulsionType, Voyage
 from app.processors.fit import parse_fit_metadata, parse_fit_laps
 from app.processors.fit_track import parse_fit_track
 from app.processors.merge import build_log_entries
+from app.templates_env import templates
 
 router = APIRouter()
-templates = Jinja2Templates(directory="app/templates")
 
 UPLOAD_DIR = os.environ.get("UPLOAD_DIR", "/app/data/uploads")
 
@@ -259,6 +258,25 @@ def add_manual_entry(
             "X-Entry-Id": str(entry.id),
         },
     )
+
+
+@router.patch("/legs/{leg_id}", response_class=HTMLResponse)
+def patch_leg(
+    leg_id: int,
+    field: str = Form(...),
+    value: str = Form(""),
+    session: Session = Depends(get_session),
+):
+    leg = session.get(Leg, leg_id)
+    if not leg:
+        return HTMLResponse("", status_code=404)
+    if field == "from_port":
+        leg.from_port = value.strip() or leg.from_port
+    elif field == "to_port":
+        leg.to_port = value.strip() or leg.to_port
+    session.add(leg)
+    session.commit()
+    return HTMLResponse("")
 
 
 @router.get("/legs/{leg_id}/summary", response_class=HTMLResponse)

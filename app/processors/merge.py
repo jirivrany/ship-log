@@ -40,6 +40,15 @@ def build_log_entries(
             air_temperature=air_temp,
         ))
 
+    # Always include first and last track points as manual anchors
+    if gpx.track_points:
+        first = gpx.track_points[0]
+        last  = gpx.track_points[-1]
+        add(first.timestamp, first.lat, first.lon, EntrySource.manual,
+            first.course, first.speed_knots, first.distance_nm, first.air_temperature)
+        add(last.timestamp, last.lat, last.lon, EntrySource.manual,
+            last.course, last.speed_knots, last.distance_nm, last.air_temperature)
+
     for pt in gpx.turning_points:
         add(pt.timestamp, pt.lat, pt.lon, EntrySource.turning_point,
             pt.course, pt.speed_knots, pt.distance_nm, pt.air_temperature)

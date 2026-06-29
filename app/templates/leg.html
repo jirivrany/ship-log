@@ -3,7 +3,21 @@
 
 {% block content %}
 <a href="/voyages/{{ voyage.id }}" class="text-muted small text-decoration-none">← {{ voyage.name }}</a>
-<h1 class="h3 mt-1 mb-0">{{ leg.from_port }} → {{ leg.to_port }}</h1>
+<h1 class="h3 mt-1 mb-0 d-flex align-items-center gap-2 flex-wrap">
+  <input type="text" value="{{ leg.from_port }}"
+         class="leg-name-input"
+         hx-patch="/legs/{{ leg.id }}"
+         hx-trigger="blur"
+         hx-swap="none"
+         hx-vals='js:{"field": "from_port", "value": event.target.value}'>
+  <span class="text-muted">→</span>
+  <input type="text" value="{{ leg.to_port }}"
+         class="leg-name-input"
+         hx-patch="/legs/{{ leg.id }}"
+         hx-trigger="blur"
+         hx-swap="none"
+         hx-vals='js:{"field": "to_port", "value": event.target.value}'>
+</h1>
 <p class="text-muted mb-4">{{ leg.date }}</p>
 
 <div id="map"></div>
@@ -192,6 +206,13 @@
   }
 
   logEntries.forEach(addMarker);
+
+  // Auto-size leg name inputs to their content
+  document.querySelectorAll('.leg-name-input').forEach(el => {
+    const resize = () => el.style.width = (el.value.length + 1) + 'ch';
+    resize();
+    el.addEventListener('input', resize);
+  });
 
   function deleteEntry(id) {
     fetch(`/entries/${id}`, { method: 'DELETE' }).then(r => {

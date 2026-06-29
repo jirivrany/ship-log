@@ -2,14 +2,14 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
-from fastapi.templating import Jinja2Templates
 from sqlmodel import Session, select
 
 from app.database import get_session
-from app.models import LogEntry, Voyage
+from app.models import Leg, LogEntry, Voyage
+from app.processors.fit_track import parse_fit_track
+from app.templates_env import templates
 
 router = APIRouter()
-templates = Jinja2Templates(directory="app/templates")
 
 
 @router.get("/", response_class=HTMLResponse)
@@ -106,13 +106,27 @@ def voyage_detail(voyage_id: int, request: Request, session: Session = Depends(g
         "both_nm":  round(sum(s["both_nm"]  for s in leg_stats.values()), 1),
     }
 
+    leg_tracks = {leg.id: _load_leg_track(leg) for leg in legs}
+
     return templates.TemplateResponse("voyage.html", {
         "request": request,
         "voyage": voyage,
         "legs": legs,
         "leg_stats": leg_stats,
         "voyage_stats": voyage_stats,
+        "leg_tracks": leg_tracks,
     })
+
+
+def _load_leg_track(leg: Leg) -> list[dict]:
+    """Return [[lat, lon], ...] for the full leg track, or [] if no FIT file."""
+    if not leg.fit_path:
+        return []
+    try:
+        track = parse_fit_track(leg.fit_path)
+    except Exception:
+        return []
+    return [[pt.lat, pt.lon] for pt in track.track_points]
 
 
 def _compute_stats(entries: list) -> dict:
