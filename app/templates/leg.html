@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% block title %}{{ leg.from_port }} → {{ leg.to_port }} — Ship Log{% endblock %}
+
+{% block content %}
+<a href="/voyages/{{ voyage.id }}" class="text-muted small text-decoration-none">← {{ voyage.name }}</a>
+<h1 class="h3 mt-1 mb-0">{{ leg.from_port }} → {{ leg.to_port }}</h1>
+<p class="text-muted mb-4">{{ leg.date }}</p>
+
+<div id="map"></div>
+
+<div class="d-flex align-items-baseline gap-3 mb-2">
+  <h2 class="h5 mb-0">Log Entries</h2>
+  <span class="text-muted small">Times in {{ tz_name }} &nbsp;·&nbsp; Fields save automatically when you leave them</span>
+</div>
+
+<div class="table-responsive border rounded">
+  <table class="log-table table table-sm table-hover mb-0">
+    <thead class="table-light">
+      <tr>
+        <th>Time</th>
+        <th>Position</th>
+        <th>COG°</th>
+        <th>SOG kn</th>
+        <th>Log Nm</th>
+        <th>Source</th>
+        <th>Propulsion</th>
+        <th>Wind dir</th>
+        <th>Wind Bf</th>
+        <th>Sea</th>
+        <th>Temp°C</th>
+        <th>Notes</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody id="log-entries">
+      {% for entry, local_time in local_entries %}
+        {% include "partials/entry_row.html" %}
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% if local_entries %}
+<div class="card p-3 mt-4">
+  <h2 class="h6 fw-semibold mb-3">Summary</h2>
+  <div id="leg-summary"
+       hx-get="/legs/{{ leg.id }}/summary"
+       hx-trigger="propulsionChanged from:body">
+    {% include "partials/leg_summary.html" %}
+  </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const trackPoints = {{ track_geojson | tojson }};
+  const logEntries = [
+    {% for entry, local_time in local_entries %}
+    {
+      lat: {{ entry.lat }},
+      lon: {{ entry.lon }},
+      source: "{{ entry.source.value }}",
+      id: {{ entry.id }},
+      time: "{{ local_time }}",
+      cog: {{ entry.course | int if entry.course else 'null' }},
+      sog: {{ "%.1f"|format(entry.speed) if entry.speed else 'null' }},
+    },
+    {% endfor %}
+  ];
+
+  const map = L.map('map');
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap contributors',
+    maxZoom: 18,
+  }).addTo(map);
+
+  if (trackPoints.length > 0) {
+    const polyline = L.polyline(trackPoints, { color: '#2563eb', weight: 2.5, opacity: 0.8 }).addTo(map);
+    map.fitBounds(polyline.getBounds(), { padding: [20, 20] });
+  }
+
+  const sourceColors = {
+    turning_point: '#dc2626',
+    lap: '#7c3aed',
+    hourly: '#059669',
+    manual: '#d97706',
+  };
+
+  logEntries.forEach(e => {
+    const color = sourceColors[e.source] || '#6b7280';
+    const marker = L.circleMarker([e.lat, e.lon], {
+      radius: e.source === 'lap' ? 8 : 6,
+      fillColor: color,
+      color: '#fff',
+      weight: 1.5,
+      opacity: 1,
+      fillOpacity: 0.9,
+    }).addTo(map);
+
+    const cogStr = e.cog !== null ? `${e.cog}°` : '—';
+    const sogStr = e.sog !== null ? `${e.sog} kn` : '—';
+    marker.bindPopup(
+      `<strong>${e.time}</strong> <span class="popup-source">${e.source.replace('_', ' ')}</span><br>` +
+      `COG ${cogStr} &nbsp; SOG ${sogStr}<br>` +
+      `<button onclick="deleteEntry(${e.id}, this)" class="popup-delete-btn">Delete entry</button>`
+    );
+
+    marker.on('contextmenu', function(ev) {
+      L.DomEvent.preventDefault(ev);
+      marker.openPopup();
+    });
+  });
+
+  function deleteEntry(id, btn) {
+    if (!confirm('Remove this log entry?')) return;
+    fetch(`/entries/${id}`, { method: 'DELETE' })
+      .then(r => { if (r.ok) window.location.reload(); });
+  }
+</script>
+{% endblock %}

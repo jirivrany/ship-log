@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}Confirm Leg — {{ voyage.name }}{% endblock %}
+
+{% block content %}
+<a href="/voyages/{{ voyage.id }}" class="text-muted small text-decoration-none">← {{ voyage.name }}</a>
+<h1 class="h3 mt-1 mb-1">Confirm Leg Details</h1>
+<p class="text-muted mb-4">Parsed from <code>{{ fit_filename }}</code> — edit if needed</p>
+
+<div class="card p-4">
+  <form action="/voyages/{{ voyage.id }}/legs" method="post">
+    <input type="hidden" name="fit_path" value="{{ fit_path }}">
+    <input type="hidden" name="timezone" value="{{ meta.timezone }}">
+
+    <h6 class="text-uppercase text-muted fw-semibold border-bottom pb-2 mb-3">Route</h6>
+    <div class="row g-3 mb-3">
+      <div class="col-md-3">
+        <label class="form-label">Date</label>
+        <input type="date" class="form-control form-control-sm" name="date" value="{{ meta.date }}" required>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">From Port</label>
+        <input type="text" class="form-control form-control-sm" name="from_port" value="{{ meta.from_port or '' }}" placeholder="e.g. Sukošan" required>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">To Port</label>
+        <input type="text" class="form-control form-control-sm" name="to_port" value="{{ meta.to_port or '' }}" placeholder="e.g. Ždrelac" required>
+      </div>
+    </div>
+
+    {% if meta.total_distance_nm or meta.start_time %}
+    <div class="d-flex gap-4 px-3 py-2 mb-4 rounded" style="background:#f0f9ff;border:1px solid #bae6fd;font-size:13px;">
+      {% if meta.start_time %}
+      <span class="text-muted">Start: <strong class="text-dark">{{ meta.start_time.strftime('%H:%M UTC') }}</strong></span>
+      {% endif %}
+      {% if meta.total_distance_nm %}
+      <span class="text-muted">Total distance: <strong class="text-dark">{{ meta.total_distance_nm }} Nm</strong></span>
+      {% endif %}
+      <span class="text-muted">Timezone: <strong class="text-dark">{{ meta.timezone }}</strong></span>
+    </div>
+    {% endif %}
+
+    <h6 class="text-uppercase text-muted fw-semibold border-bottom pb-2 mb-3">Prefill log entries</h6>
+    <p class="text-muted small mb-3">These values will be applied to all generated entries — you can override per row afterwards</p>
+    <div class="row g-3 mb-4">
+      <div class="col-md-3">
+        <label class="form-label">Propulsion</label>
+        <select name="default_propulsion" class="form-select form-select-sm">
+          <option value="">— none —</option>
+          {% for p in propulsion_types %}
+          <option value="{{ p.value }}">{{ p.value }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Wind direction</label>
+        <input type="text" class="form-control form-control-sm" name="default_wind_direction" placeholder="e.g. NW">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Wind force (Bf)</label>
+        <input type="number" class="form-control form-control-sm" name="default_wind_force" placeholder="0–12" min="0" max="12">
+      </div>
+    </div>
+
+    <div class="d-flex gap-2">
+      <button type="submit" class="btn btn-primary">Confirm &amp; Process</button>
+      <a href="/voyages/{{ voyage.id }}/legs/new" class="btn btn-secondary">Back</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

@@ -1,0 +1,34 @@
+<div class="d-flex flex-wrap gap-4">
+  <div>
+    <div class="text-muted small">Total</div>
+    <div class="fs-4 fw-bold">{{ stats.total_nm }} Nm</div>
+  </div>
+  {% if stats.motor_nm > 0 %}
+  <div>
+    <div class="text-muted small">Motor</div>
+    <div class="fs-4 fw-bold">{{ stats.motor_nm }} Nm</div>
+  </div>
+  {% endif %}
+  {% if stats.sail_nm > 0 %}
+  <div>
+    <div class="text-muted small">Sail</div>
+    <div class="fs-4 fw-bold">{{ stats.sail_nm }} Nm</div>
+  </div>
+  {% endif %}
+  {% if stats.both_nm > 0 %}
+  <div>
+    <div class="text-muted small">Motor + sail</div>
+    <div class="fs-4 fw-bold">{{ stats.both_nm }} Nm</div>
+  </div>
+  {% endif %}
+  <div class="border-start ps-4">
+    <div class="text-muted small">Log entries</div>
+    <div class="fs-4 fw-bold">{{ stats.entry_count }}</div>
+  </div>
+  {% if stats.lap_count > 0 %}
+  <div>
+    <div class="text-muted small">Lap markers</div>
+    <div class="fs-4 fw-bold">{{ stats.lap_count }}</div>
+  </div>
+  {% endif %}
+</div>

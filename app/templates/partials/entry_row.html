@@ -1,0 +1,76 @@
+<tr id="entry-{{ entry.id }}" class="log-row log-row--{{ entry.source.value }}">
+  <td>{{ local_time }}</td>
+  <td class="coords">{{ "%.4f"|format(entry.lat) }}, {{ "%.4f"|format(entry.lon) }}</td>
+  <td>{{ entry.course | int if entry.course else '—' }}</td>
+  <td>{{ "%.1f"|format(entry.speed) if entry.speed else '—' }}</td>
+  <td>{{ "%.1f"|format(entry.log_value) if entry.log_value else '—' }}</td>
+  <td><span class="badge badge--{{ entry.source.value }}">{{ entry.source.value.replace('_', ' ') }}</span></td>
+
+  <td>
+    <select class="input-sm"
+            hx-patch="/entries/{{ entry.id }}"
+            hx-trigger="change"
+            hx-swap="none"
+            hx-vals='js:{"field": "propulsion", "value": event.target.value}'
+            hx-on::after-request="htmx.trigger(document.body, 'propulsionChanged')">
+      <option value="">—</option>
+      <option value="motor"  {% if entry.propulsion and entry.propulsion.value == 'motor'  %}selected{% endif %}>motor</option>
+      <option value="sail"   {% if entry.propulsion and entry.propulsion.value == 'sail'   %}selected{% endif %}>sail</option>
+      <option value="both"   {% if entry.propulsion and entry.propulsion.value == 'both'   %}selected{% endif %}>both</option>
+      <option value="anchor" {% if entry.propulsion and entry.propulsion.value == 'anchor' %}selected{% endif %}>anchor</option>
+    </select>
+  </td>
+
+  <td>
+    <input type="text" value="{{ entry.wind_direction or '' }}"
+           placeholder="NW" class="input-sm input-narrow"
+           hx-patch="/entries/{{ entry.id }}"
+           hx-trigger="blur"
+           hx-swap="none"
+           hx-vals='js:{"field": "wind_direction", "value": event.target.value}'>
+  </td>
+
+  <td>
+    <input type="number" value="{{ entry.wind_force or '' }}"
+           placeholder="Bf" min="0" max="12" class="input-sm input-narrow"
+           hx-patch="/entries/{{ entry.id }}"
+           hx-trigger="blur"
+           hx-swap="none"
+           hx-vals='js:{"field": "wind_force", "value": event.target.value}'>
+  </td>
+
+  <td>
+    <input type="number" value="{{ entry.sea_state or '' }}"
+           min="0" max="9" class="input-sm input-narrow"
+           hx-patch="/entries/{{ entry.id }}"
+           hx-trigger="blur"
+           hx-swap="none"
+           hx-vals='js:{"field": "sea_state", "value": event.target.value}'>
+  </td>
+
+  <td>
+    <input type="number" value="{{ entry.air_temperature or '' }}"
+           step="0.1" class="input-sm input-narrow"
+           hx-patch="/entries/{{ entry.id }}"
+           hx-trigger="blur"
+           hx-swap="none"
+           hx-vals='js:{"field": "air_temperature", "value": event.target.value}'>
+  </td>
+
+  <td>
+    <input type="text" value="{{ entry.notes or '' }}"
+           placeholder="Notes…" class="input-sm input-notes"
+           hx-patch="/entries/{{ entry.id }}"
+           hx-trigger="blur"
+           hx-swap="none"
+           hx-vals='js:{"field": "notes", "value": event.target.value}'>
+  </td>
+
+  <td>
+    <button class="btn btn-sm btn-outline-danger px-2 py-0"
+            hx-delete="/entries/{{ entry.id }}"
+            hx-target="#entry-{{ entry.id }}"
+            hx-swap="outerHTML"
+            hx-confirm="Remove this log entry?">✕</button>
+  </td>
+</tr>

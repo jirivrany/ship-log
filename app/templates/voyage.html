@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+{% block title %}{{ voyage.name }} — Ship Log{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-1">
+  <a href="/" class="text-muted small text-decoration-none">← All Voyages</a>
+  <a href="/voyages/{{ voyage.id }}/legs/new" class="btn btn-primary btn-sm">+ Add Leg</a>
+</div>
+<h1 class="h3">{{ voyage.name }}</h1>
+<p class="text-muted mb-4">{{ voyage.boat }}{% if voyage.registration_number %} · {{ voyage.registration_number }}{% endif %}</p>
+
+<div class="row g-4">
+
+  <div class="col-lg-8">
+    <h2 class="h5 mb-3">Legs</h2>
+    {% if legs %}
+    <div class="d-flex flex-column gap-2">
+      {% for leg in legs %}
+      {% set s = leg_stats[leg.id] %}
+      <div class="card px-3 py-3 d-flex flex-row align-items-center gap-3">
+        <a href="/legs/{{ leg.id }}" class="flex-grow-1 text-decoration-none text-dark">
+          <div class="fw-semibold">{{ leg.from_port }} → {{ leg.to_port }}</div>
+          <div class="text-muted small d-flex gap-3 mt-1">
+            <span>{{ leg.date }}</span>
+            <span>{{ s.entry_count }} entries</span>
+            {% if s.total_nm > 0 %}
+            <span class="fw-medium text-dark">{{ s.total_nm }} Nm</span>
+            {% if s.motor_nm > 0 %}<span>motor {{ s.motor_nm }} Nm</span>{% endif %}
+            {% if s.sail_nm > 0 %}<span>sail {{ s.sail_nm }} Nm</span>{% endif %}
+            {% if s.both_nm > 0 %}<span>motor+sail {{ s.both_nm }} Nm</span>{% endif %}
+            {% endif %}
+          </div>
+        </a>
+        <button class="btn btn-sm btn-outline-danger"
+                hx-delete="/legs/{{ leg.id }}"
+                hx-confirm="Delete leg {{ leg.from_port }} → {{ leg.to_port }} and all its log entries?"
+                hx-target="closest .card"
+                hx-swap="outerHTML">Delete</button>
+      </div>
+      {% endfor %}
+    </div>
+
+    {% if voyage_stats.total_nm > 0 %}
+    <div class="card p-3 mt-3">
+      <h3 class="h6 fw-semibold mb-3">Voyage totals</h3>
+      <div class="d-flex flex-wrap gap-4">
+        <div>
+          <div class="text-muted small">Total</div>
+          <div class="fs-5 fw-bold">{{ voyage_stats.total_nm }} Nm</div>
+        </div>
+        {% if voyage_stats.motor_nm > 0 %}
+        <div>
+          <div class="text-muted small">Motor</div>
+          <div class="fs-5 fw-bold">{{ voyage_stats.motor_nm }} Nm</div>
+        </div>
+        {% endif %}
+        {% if voyage_stats.sail_nm > 0 %}
+        <div>
+          <div class="text-muted small">Sail</div>
+          <div class="fs-5 fw-bold">{{ voyage_stats.sail_nm }} Nm</div>
+        </div>
+        {% endif %}
+        {% if voyage_stats.both_nm > 0 %}
+        <div>
+          <div class="text-muted small">Motor + sail</div>
+          <div class="fs-5 fw-bold">{{ voyage_stats.both_nm }} Nm</div>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+
+    {% else %}
+    <p class="text-muted">No legs yet. Add the first leg above.</p>
+    {% endif %}
+  </div>
+
+  <div class="col-lg-4">
+    <div class="card p-3">
+      <h3 class="h6 fw-semibold mb-3">Boat details</h3>
+
+      <div class="mb-3">
+        <div class="text-uppercase text-muted fw-semibold" style="font-size:10px;letter-spacing:.06em">Identification</div>
+        {% if voyage.home_port %}
+        <div class="d-flex justify-content-between border-bottom py-1 small"><span class="text-muted">Home port</span><span class="fw-medium">{{ voyage.home_port }}</span></div>
+        {% endif %}
+        {% if voyage.call_sign %}
+        <div class="d-flex justify-content-between border-bottom py-1 small"><span class="text-muted">Call sign</span><span class="fw-medium">{{ voyage.call_sign }}</span></div>
+        {% endif %}
+        {% if voyage.owner %}
+        <div class="d-flex justify-content-between border-bottom py-1 small"><span class="text-muted">Owner</span><span class="fw-medium">{{ voyage.owner }}</span></div>
+        {% endif %}
+        {% if voyage.crew %}
+        <div class="d-flex justify-content-between border-bottom py-1 small"><span class="text-muted">Crew</span><span class="fw-medium">{{ voyage.crew }}</span></div>
+        {% endif %}
+      </div>
+
+      {% if voyage.length_m or voyage.beam_m or voyage.draft_m or voyage.displacement_t or voyage.max_persons %}
+      <div class="mb-3">
+        <div class="text-uppercase text-muted fw-semibold mb-1" style="font-size:10px;letter-spacing:.06em">Dimensions</div>
+        {% if voyage.length_m %}<div class="d-flex justify-content-between border-bottom py-1 small"><span class="text-muted">Length</span><span class="fw-medium">{{ voyage.length_m }} m</span></div>{% endif %}
+        {% if voyage.beam_m %}<div class="d-flex justify-content-between border-bottom py-1 small"><span class="text-muted">Beam</span><span class="fw-medium">{{ voyage.beam_m }} m</span></div>{% endif %}
+        {% if voyage.draft_m %}<div class="d-flex justify-content-between border-bottom py-1 small"><span class="text-muted">Draft</span><span class="fw-medium">{{ voyage.draft_m }} m</span></div>{% endif %}
+        {% if voyage.displacement_t %}<div class="d-flex justify-content-between border-bottom py-1 small"><span class="text-muted">Displacement</span><span class="fw-medium">{{ voyage.displacement_t }} t</span></div>{% endif %}
+        {% if voyage.max_persons %}<div class="d-flex justify-content-between border-bottom py-1 small"><span class="text-muted">Max persons</span><span class="fw-medium">{{ voyage.max_persons }}</span></div>{% endif %}
+      </div>
+      {% endif %}
+
+      {% if voyage.engine_type or voyage.engine_power_kw %}
+      <div class="mb-3">
+        <div class="text-uppercase text-muted fw-semibold mb-1" style="font-size:10px;letter-spacing:.06em">Engine</div>
+        {% if voyage.engine_type %}<div class="d-flex justify-content-between border-bottom py-1 small"><span class="text-muted">Type</span><span class="fw-medium">{{ voyage.engine_type }}</span></div>{% endif %}
+        {% if voyage.engine_power_kw %}<div class="d-flex justify-content-between border-bottom py-1 small"><span class="text-muted">Power</span><span class="fw-medium">{{ voyage.engine_power_kw }} kW</span></div>{% endif %}
+      </div>
+      {% endif %}
+
+      {% if voyage.sail_area_m2 or voyage.mainsail_m2 or voyage.genoa_m2 %}
+      <div class="mb-3">
+        <div class="text-uppercase text-muted fw-semibold mb-1" style="font-size:10px;letter-spacing:.06em">Sails</div>
+        {% if voyage.sail_area_m2 %}<div class="d-flex justify-content-between border-bottom py-1 small"><span class="text-muted">Total area</span><span class="fw-medium">{{ voyage.sail_area_m2 }} m²</span></div>{% endif %}
+        {% if voyage.mainsail_m2 %}<div class="d-flex justify-content-between border-bottom py-1 small"><span class="text-muted">Mainsail</span><span class="fw-medium">{{ voyage.mainsail_m2 }} m²</span></div>{% endif %}
+        {% if voyage.genoa_m2 %}<div class="d-flex justify-content-between border-bottom py-1 small"><span class="text-muted">Genoa</span><span class="fw-medium">{{ voyage.genoa_m2 }} m²</span></div>{% endif %}
+      </div>
+      {% endif %}
+
+      {% if voyage.water_tank_l or voyage.fuel_tank_l %}
+      <div>
+        <div class="text-uppercase text-muted fw-semibold mb-1" style="font-size:10px;letter-spacing:.06em">Tanks</div>
+        {% if voyage.water_tank_l %}<div class="d-flex justify-content-between border-bottom py-1 small"><span class="text-muted">Water</span><span class="fw-medium">{{ voyage.water_tank_l }} l</span></div>{% endif %}
+        {% if voyage.fuel_tank_l %}<div class="d-flex justify-content-between border-bottom py-1 small"><span class="text-muted">Fuel</span><span class="fw-medium">{{ voyage.fuel_tank_l }} l</span></div>{% endif %}
+      </div>
+      {% endif %}
+
+    </div>
+  </div>
+
+</div>
+{% endblock %}
