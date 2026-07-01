@@ -36,12 +36,6 @@
     <div class="text-muted small">{{ voyage_stats.both_hhmm }}</div>
   </div>
   {% endif %}
-  {% if voyage_stats.unknown_nm > 0 %}
-  <div>
-    <div class="text-muted small">Unknown</div>
-    <div class="fs-5 fw-bold">{{ voyage_stats.unknown_nm }} Nm</div>
-  </div>
-  {% endif %}
   <div class="border-start ps-4">
     <div class="text-muted small">Time</div>
     <div class="fs-5 fw-bold">{{ voyage_stats.duration_hhmm }}</div>

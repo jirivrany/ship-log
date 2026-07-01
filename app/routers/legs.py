@@ -72,7 +72,7 @@ async def create_leg(
     timezone: str = Form("UTC"),
     fit_path: str = Form(...),
     # prefill defaults applied to all generated entries
-    default_propulsion: Optional[str] = Form(None),
+    default_propulsion: str = Form("motor"),
     default_wind_direction: Optional[str] = Form(None),
     default_wind_force: Optional[str] = Form(None),
     session: Session = Depends(get_session),
@@ -119,18 +119,26 @@ async def create_leg(
         pass
 
     # Parse prefill defaults
-    prefill_propulsion = PropulsionType(default_propulsion) if default_propulsion else None
+    prefill_propulsion = PropulsionType(default_propulsion)
     prefill_wind_dir = default_wind_direction.strip() or None if default_wind_direction else None
     prefill_wind_force = int(default_wind_force) if default_wind_force and default_wind_force.strip() else None
 
     entries = build_log_entries(leg.id, track, laps)
     for entry in entries:
-        if prefill_propulsion:
-            entry.propulsion = prefill_propulsion
+        entry.propulsion = prefill_propulsion
         if prefill_wind_dir:
             entry.wind_direction = prefill_wind_dir
         if prefill_wind_force is not None:
             entry.wind_force = prefill_wind_force
+
+    # A leg almost always starts and ends under motor power (departing/arriving
+    # under sail is forbidden in most harbors) — unless the sailor explicitly
+    # chose a non-motor propulsion for the whole leg, force the anchor points.
+    if entries and prefill_propulsion == PropulsionType.motor:
+        entries[0].propulsion = PropulsionType.motor
+        entries[-1].propulsion = PropulsionType.motor
+
+    for entry in entries:
         session.add(entry)
     session.commit()
 
@@ -219,7 +227,7 @@ def add_manual_entry(
         speed=speed,
         log_value=dist_nm,
         air_temperature=temp,
-        propulsion=inherit.propulsion if inherit else None,
+        propulsion=inherit.propulsion if inherit else PropulsionType.motor,
         wind_direction=inherit.wind_direction if inherit else None,
         wind_force=inherit.wind_force if inherit else None,
     )

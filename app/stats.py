@@ -13,7 +13,8 @@ def compute_stats(entries: list, *, wall_clock_duration: bool = True) -> dict:
     """Compute distance and time stats from a list of LogEntry objects.
 
     Iterates consecutive entry pairs and accumulates nautical miles and minutes
-    per propulsion bucket.  Entries with propulsion=None go into "unknown".
+    per propulsion bucket. Propulsion is always set (defaults to motor), so
+    every segment is attributed to a concrete bucket.
     Segments with dist <= 0 are skipped (handles cross-leg log_value resets).
 
     wall_clock_duration=True (default): total duration = last.timestamp - first.timestamp.
@@ -29,7 +30,7 @@ def compute_stats(entries: list, *, wall_clock_duration: bool = True) -> dict:
         dist = cur.log_value - prev.log_value
         if dist <= 0:
             continue
-        key = prev.propulsion.value if prev.propulsion else "unknown"
+        key = prev.propulsion.value
         nm_by_prop[key] = nm_by_prop.get(key, 0.0) + dist
         if prev.timestamp and cur.timestamp:
             mins = (cur.timestamp - prev.timestamp).total_seconds() / 60
@@ -50,7 +51,6 @@ def compute_stats(entries: list, *, wall_clock_duration: bool = True) -> dict:
         "sail_nm":    round(nm_by_prop.get("sail",    0.0), 1),
         "both_nm":    round(nm_by_prop.get("both",    0.0), 1),
         "anchor_nm":  round(nm_by_prop.get("anchor",  0.0), 1),
-        "unknown_nm": round(nm_by_prop.get("unknown", 0.0), 1),
         "duration_hhmm": _format_hhmm(duration_minutes),
         "motor_hhmm":    _format_hhmm(min_by_prop.get("motor",   0.0)),
         "sail_hhmm":     _format_hhmm(min_by_prop.get("sail",    0.0)),

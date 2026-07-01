@@ -45,9 +45,8 @@
       <div class="col-md-3">
         <label class="form-label">Propulsion</label>
         <select name="default_propulsion" class="form-select form-select-sm">
-          <option value="">— none —</option>
           {% for p in propulsion_types %}
-          <option value="{{ p.value }}">{{ p.value }}</option>
+          <option value="{{ p.value }}" {% if p.value == 'motor' %}selected{% endif %}>{{ p.value }}</option>
           {% endfor %}
         </select>
       </div>

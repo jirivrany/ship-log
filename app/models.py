@@ -76,7 +76,7 @@ class LogEntry(SQLModel, table=True):
     log_value: Optional[float] = None    # distance Nm from leg start
 
     # manually filled
-    propulsion: Optional[PropulsionType] = None
+    propulsion: PropulsionType = Field(default=PropulsionType.motor)
     wind_direction: Optional[str] = None  # e.g. "NW" or "315"
     wind_force: Optional[int] = None      # Beaufort
     sea_state: Optional[int] = None       # Beaufort

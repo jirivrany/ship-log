@@ -13,11 +13,10 @@
             hx-swap="none"
             hx-vals='js:{"field": "propulsion", "value": event.target.value}'
             hx-on::after-request="htmx.trigger(document.body, 'propulsionChanged')">
-      <option value="">—</option>
-      <option value="motor"  {% if entry.propulsion and entry.propulsion.value == 'motor'  %}selected{% endif %}>motor</option>
-      <option value="sail"   {% if entry.propulsion and entry.propulsion.value == 'sail'   %}selected{% endif %}>sail</option>
-      <option value="both"   {% if entry.propulsion and entry.propulsion.value == 'both'   %}selected{% endif %}>both</option>
-      <option value="anchor" {% if entry.propulsion and entry.propulsion.value == 'anchor' %}selected{% endif %}>anchor</option>
+      <option value="motor"  {% if entry.propulsion.value == 'motor'  %}selected{% endif %}>motor</option>
+      <option value="sail"   {% if entry.propulsion.value == 'sail'   %}selected{% endif %}>sail</option>
+      <option value="both"   {% if entry.propulsion.value == 'both'   %}selected{% endif %}>both</option>
+      <option value="anchor" {% if entry.propulsion.value == 'anchor' %}selected{% endif %}>anchor</option>
     </select>
   </td>
 

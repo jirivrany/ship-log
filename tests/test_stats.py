@@ -4,7 +4,7 @@ from app.models import EntrySource, LogEntry, PropulsionType
 from app.stats import _format_hhmm, compute_stats
 
 
-def _entry(leg_id=1, minutes_offset=0, log_value=None, propulsion=None, source=EntrySource.manual):
+def _entry(leg_id=1, minutes_offset=0, log_value=None, propulsion="motor", source=EntrySource.manual):
     ts = datetime(2026, 6, 20, 8, 0, 0, tzinfo=timezone.utc)
     from datetime import timedelta
     ts = ts + timedelta(minutes=minutes_offset)
@@ -15,7 +15,7 @@ def _entry(leg_id=1, minutes_offset=0, log_value=None, propulsion=None, source=E
         lon=15.0,
         source=source,
         log_value=log_value,
-        propulsion=PropulsionType(propulsion) if propulsion else None,
+        propulsion=PropulsionType(propulsion),
     )
     return e
 
@@ -48,32 +48,30 @@ def test_single_entry():
     assert s["total_nm"] == 0.0
     assert s["entry_count"] == 1
 
-def test_all_none_propulsion_goes_to_unknown():
+def test_all_motor_propulsion_by_default():
     entries = [
         _entry(minutes_offset=0,  log_value=0.0),
         _entry(minutes_offset=60, log_value=10.0),
     ]
     s = compute_stats(entries)
-    assert s["unknown_nm"] == 10.0
-    assert s["motor_nm"] == 0.0
+    assert s["motor_nm"] == 10.0
     assert s["total_nm"] == 10.0
+    assert "unknown_nm" not in s
 
 def test_mixed_propulsion_buckets():
     # propulsion key is taken from PREV entry in each segment
     # seg 0→1: prev=motor, dist=10  → motor=10
     # seg 1→2: prev=sail,  dist=15  → sail=15
     # seg 2→3: prev=sail,  dist=5   → sail+=5 → sail=20
-    # seg 3 has no propulsion (unknown), but there's no seg 3→4, so unknown=0
     entries = [
         _entry(minutes_offset=0,   log_value=0.0,  propulsion="motor"),
         _entry(minutes_offset=60,  log_value=10.0, propulsion="sail"),
         _entry(minutes_offset=120, log_value=25.0, propulsion="sail"),
-        _entry(minutes_offset=180, log_value=30.0),
+        _entry(minutes_offset=180, log_value=30.0, propulsion="sail"),
     ]
     s = compute_stats(entries)
     assert s["motor_nm"] == 10.0
     assert s["sail_nm"] == 20.0
-    assert s["unknown_nm"] == 0.0
     assert s["total_nm"] == 30.0
 
 def test_cross_leg_boundary_negative_dist_skipped():
@@ -92,7 +90,7 @@ def test_cross_leg_boundary_negative_dist_skipped():
 def test_wall_clock_duration():
     entries = [
         _entry(minutes_offset=0,   log_value=0.0,  propulsion="sail"),
-        _entry(minutes_offset=30,  log_value=5.0),   # no propulsion — gap not in min_by_prop
+        _entry(minutes_offset=30,  log_value=5.0,  propulsion="motor"),
         _entry(minutes_offset=120, log_value=20.0, propulsion="sail"),
     ]
     s = compute_stats(entries)
