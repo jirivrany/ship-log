@@ -22,7 +22,8 @@ class TrackPoint:
     speed_knots: float
     course: Optional[float]
     air_temperature: Optional[float]
-    distance_nm: float          # cumulative from leg start
+    distance_nm: float               # cumulative haversine from leg start
+    raw_distance_nm: Optional[float] = None  # cumulative from FIT file's distance field
 
 
 @dataclass
@@ -79,7 +80,7 @@ def parse_fit_track(path: str) -> ProcessedTrack:
     fit = fitparse.FitFile(path)
 
     # Collect all records with position
-    raw: list[tuple[datetime, float, float, float, Optional[float]]] = []
+    raw: list[tuple[datetime, float, float, float, Optional[float], Optional[float]]] = []
     for msg in fit.get_messages("record"):
         fields = {f.name: f.value for f in msg.fields if f.value is not None}
         ts = fields.get("timestamp")
@@ -93,7 +94,9 @@ def parse_fit_track(path: str) -> ProcessedTrack:
         speed_ms = fields.get("enhanced_speed") or fields.get("speed") or 0.0
         speed_kn = speed_ms * 1.94384
         temp = fields.get("temperature")
-        raw.append((ts, lat, lon, speed_kn, temp))
+        dist_m = fields.get("distance")
+        raw_dist_nm = round(dist_m / 1852.0, 3) if dist_m is not None else None
+        raw.append((ts, lat, lon, speed_kn, temp, raw_dist_nm))
 
     if not raw:
         return ProcessedTrack([], [], [])
@@ -110,13 +113,13 @@ def parse_fit_track(path: str) -> ProcessedTrack:
     track_points: list[TrackPoint] = []
     cumulative_nm = 0.0
 
-    for i, (ts, lat, lon, speed_kn, temp) in enumerate(sampled):
+    for i, (ts, lat, lon, speed_kn, temp, raw_dist_nm) in enumerate(sampled):
         if i > 0:
             prev = sampled[i - 1]
             cumulative_nm += _haversine_m(prev[1], prev[2], lat, lon) / 1852.0
 
         if i + 1 < len(sampled):
-            _, nlat, nlon, _, _ = sampled[i + 1]
+            _, nlat, nlon, _, _, _ = sampled[i + 1]
             course = _bearing(lat, lon, nlat, nlon)
         else:
             course = track_points[-1].course if track_points else None
@@ -129,6 +132,7 @@ def parse_fit_track(path: str) -> ProcessedTrack:
             course=round(course, 1) if course is not None else None,
             air_temperature=temp,
             distance_nm=round(cumulative_nm, 3),
+            raw_distance_nm=raw_dist_nm,
         ))
 
     # ------------------------------------------------------------------ #

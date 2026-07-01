@@ -7,6 +7,7 @@ from sqlmodel import Session, select
 from app.database import get_session
 from app.models import Leg, LogEntry, Voyage
 from app.processors.fit_track import parse_fit_track
+from app.stats import compute_stats
 from app.templates_env import templates
 
 router = APIRouter()
@@ -123,38 +124,8 @@ def _load_leg_track(leg: Leg) -> list[dict]:
     return [[pt.lat, pt.lon] for pt in track.track_points]
 
 
-def _format_hhmm(minutes: float) -> str:
-    total = int(minutes)
-    return f"{total // 60}:{total % 60:02d}"
-
-
 def _compute_stats(entries: list) -> dict:
-    nm_by_prop: dict[str, float] = {}
-    min_by_prop: dict[str, float] = {}
-    for i in range(1, len(entries)):
-        prev, cur = entries[i - 1], entries[i]
-        if prev.log_value is None or cur.log_value is None:
-            continue
-        dist = cur.log_value - prev.log_value
-        if dist <= 0:
-            continue
-        key = prev.propulsion.value if prev.propulsion else "motor"
-        nm_by_prop[key] = nm_by_prop.get(key, 0.0) + dist
-        if prev.timestamp and cur.timestamp:
-            mins = (cur.timestamp - prev.timestamp).total_seconds() / 60
-            min_by_prop[key] = min_by_prop.get(key, 0.0) + mins
-    total = sum(nm_by_prop.values())
-    total_minutes = sum(min_by_prop.values())
-    return {
-        "total_nm": round(total, 2),
-        "motor_nm": round(nm_by_prop.get("motor", 0.0), 2),
-        "sail_nm":  round(nm_by_prop.get("sail",  0.0), 2),
-        "both_nm":  round(nm_by_prop.get("both",  0.0), 2),
-        "duration_hhmm": _format_hhmm(total_minutes),
-        "motor_hhmm":    _format_hhmm(min_by_prop.get("motor", 0.0)),
-        "sail_hhmm":     _format_hhmm(min_by_prop.get("sail",  0.0)),
-        "both_hhmm":     _format_hhmm(min_by_prop.get("both",  0.0)),
-    }
+    return compute_stats(entries)
 
 
 @router.delete("/voyages/{voyage_id}", response_class=RedirectResponse)

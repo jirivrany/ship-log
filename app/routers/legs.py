@@ -1,9 +1,10 @@
 import os
+import pathlib
 import shutil
 from typing import Optional
 from zoneinfo import ZoneInfo
 
-from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlmodel import Session, select
 
@@ -12,6 +13,7 @@ from app.models import Leg, LogEntry, PropulsionType, Voyage
 from app.processors.fit import parse_fit_metadata, parse_fit_laps
 from app.processors.fit_track import parse_fit_track
 from app.processors.merge import build_log_entries
+from app.stats import compute_stats
 from app.templates_env import templates
 
 router = APIRouter()
@@ -79,7 +81,19 @@ async def create_leg(
     if not voyage:
         return HTMLResponse("Voyage not found", status_code=404)
 
-    leg_dir = os.path.join(UPLOAD_DIR, f"voyage_{voyage_id}", f"{date}_{from_port}-{to_port}")
+    # Validate fit_path is inside the staging area for this voyage
+    staging_dir = pathlib.Path(UPLOAD_DIR, "staging", f"voyage_{voyage_id}").resolve()
+    real_fit = pathlib.Path(fit_path).resolve()
+    if not str(real_fit).startswith(str(staging_dir) + os.sep):
+        raise HTTPException(status_code=400, detail="Invalid file path")
+
+    # Validate leg_dir stays inside UPLOAD_DIR (guards against .. in port names)
+    upload_root = pathlib.Path(UPLOAD_DIR).resolve()
+    leg_dir_path = pathlib.Path(UPLOAD_DIR, f"voyage_{voyage_id}", f"{date}_{from_port}-{to_port}")
+    if not leg_dir_path.resolve().is_relative_to(upload_root):
+        raise HTTPException(status_code=400, detail="Invalid port name")
+
+    leg_dir = str(leg_dir_path)
     os.makedirs(leg_dir, exist_ok=True)
     filename = os.path.basename(fit_path)
     final_path = os.path.join(leg_dir, filename)
@@ -158,44 +172,8 @@ def leg_detail(leg_id: int, request: Request, session: Session = Depends(get_ses
     })
 
 
-def _format_hhmm(minutes: float) -> str:
-    total = int(minutes)
-    return f"{total // 60}:{total % 60:02d}"
-
-
 def _compute_leg_stats(entries: list) -> dict:
-    """Compute total / motor / sail / both Nm and time from consecutive log_value gaps."""
-    nm_by_prop: dict[str, float] = {}
-    min_by_prop: dict[str, float] = {}
-    for i in range(1, len(entries)):
-        prev, cur = entries[i - 1], entries[i]
-        if prev.log_value is None or cur.log_value is None:
-            continue
-        dist = cur.log_value - prev.log_value
-        if dist <= 0:
-            continue
-        key = prev.propulsion.value if prev.propulsion else "motor"
-        nm_by_prop[key] = nm_by_prop.get(key, 0.0) + dist
-        if prev.timestamp and cur.timestamp:
-            mins = (cur.timestamp - prev.timestamp).total_seconds() / 60
-            min_by_prop[key] = min_by_prop.get(key, 0.0) + mins
-
-    total = sum(nm_by_prop.values())
-    duration_minutes = 0.0
-    if len(entries) >= 2 and entries[0].timestamp and entries[-1].timestamp:
-        duration_minutes = (entries[-1].timestamp - entries[0].timestamp).total_seconds() / 60
-    return {
-        "total_nm": round(total, 1),
-        "motor_nm": round(nm_by_prop.get("motor", 0.0), 1),
-        "sail_nm": round(nm_by_prop.get("sail", 0.0), 1),
-        "both_nm": round(nm_by_prop.get("both", 0.0), 1),
-        "duration_hhmm": _format_hhmm(duration_minutes),
-        "motor_hhmm": _format_hhmm(min_by_prop.get("motor", 0.0)),
-        "sail_hhmm": _format_hhmm(min_by_prop.get("sail", 0.0)),
-        "both_hhmm": _format_hhmm(min_by_prop.get("both", 0.0)),
-        "entry_count": len(entries),
-        "lap_count": sum(1 for e in entries if e.source.value == "lap"),
-    }
+    return compute_stats(entries)
 
 
 @router.post("/legs/{leg_id}/entries", response_class=HTMLResponse)
@@ -318,56 +296,20 @@ def delete_leg(leg_id: int, session: Session = Depends(get_session)):
 
 
 def _load_track_points(fit_path: str) -> list[dict]:
-    """Return sampled track points with full metadata for map rendering and manual entry creation."""
+    """Return sampled track points for map rendering and manual entry creation."""
     try:
-        import fitparse
-        import math
-        SC = 180.0 / (2**31)
-        fit = fitparse.FitFile(fit_path)
-        raw = []
-        last_ts = None
-        for msg in fit.get_messages("record"):
-            fields = {f.name: f.value for f in msg.fields if f.value is not None}
-            ts = fields.get("timestamp")
-            lat_sc = fields.get("position_lat")
-            lon_sc = fields.get("position_long")
-            if ts is None or lat_sc is None or lon_sc is None:
-                continue
-            if ts.tzinfo is None:
-                from datetime import timezone
-                ts = ts.replace(tzinfo=timezone.utc)
-            if last_ts is None or (ts - last_ts).total_seconds() >= 30:
-                speed_ms = fields.get("enhanced_speed") or fields.get("speed") or 0.0
-                raw.append({
-                    "ts": ts,
-                    "lat": lat_sc * SC,
-                    "lon": lon_sc * SC,
-                    "speed": round(speed_ms * 1.94384, 2),
-                    "temp": fields.get("temperature"),
-                    "dist_m": fields.get("distance") or 0.0,
-                })
-                last_ts = ts
-
-        # Compute COG as bearing to next point (same logic as fit_track.py)
-        def _bearing(lat1, lon1, lat2, lon2):
-            phi1, phi2 = math.radians(lat1), math.radians(lat2)
-            dl = math.radians(lon2 - lon1)
-            x = math.sin(dl) * math.cos(phi2)
-            y = math.cos(phi1) * math.sin(phi2) - math.sin(phi1) * math.cos(phi2) * math.cos(dl)
-            return round((math.degrees(math.atan2(x, y)) + 360) % 360, 1)
-
-        result = []
-        for i, pt in enumerate(raw):
-            cog = _bearing(pt["lat"], pt["lon"], raw[i+1]["lat"], raw[i+1]["lon"]) if i + 1 < len(raw) else (result[-1]["cog"] if result else None)
-            result.append({
-                "lat": pt["lat"],
-                "lon": pt["lon"],
-                "ts": pt["ts"].isoformat(),
-                "speed": pt["speed"],
-                "cog": cog,
-                "temp": pt["temp"],
-                "dist_nm": round(pt["dist_m"] / 1852.0, 3),
-            })
-        return result
+        track = parse_fit_track(fit_path)
     except Exception:
         return []
+    result = []
+    for pt in track.track_points:
+        result.append({
+            "lat": pt.lat,
+            "lon": pt.lon,
+            "ts": pt.timestamp.isoformat(),
+            "speed": pt.speed_knots,
+            "cog": pt.course,
+            "temp": pt.air_temperature,
+            "dist_nm": pt.raw_distance_nm if pt.raw_distance_nm is not None else pt.distance_nm,
+        })
+    return result

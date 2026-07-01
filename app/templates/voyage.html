@@ -36,6 +36,12 @@
     <div class="text-muted small">{{ voyage_stats.both_hhmm }}</div>
   </div>
   {% endif %}
+  {% if voyage_stats.unknown_nm > 0 %}
+  <div>
+    <div class="text-muted small">Unknown</div>
+    <div class="fs-5 fw-bold">{{ voyage_stats.unknown_nm }} Nm</div>
+  </div>
+  {% endif %}
   <div class="border-start ps-4">
     <div class="text-muted small">Time</div>
     <div class="fs-5 fw-bold">{{ voyage_stats.duration_hhmm }}</div>
@@ -181,16 +187,16 @@
       color: COLORS[{{ idx }} % COLORS.length],
       weight: 3,
       opacity: 0.85,
-    }).bindTooltip('{{ leg.from_port }} → {{ leg.to_port }}', { sticky: true }).addTo(map);
+    }).bindTooltip({{ (leg.from_port + ' → ' + leg.to_port) | tojson }}, { sticky: true }).addTo(map);
 
     const first{{ idx }} = pts{{ idx }}[0];
     const last{{ idx }} = pts{{ idx }}[pts{{ idx }}.length - 1];
 
     L.circleMarker(first{{ idx }}, { radius: 5, fillColor: COLORS[{{ idx }} % COLORS.length], color: '#fff', weight: 1.5, fillOpacity: 1 })
-      .bindPopup('<strong>{{ leg.from_port }}</strong><br><small>{{ leg.date }}</small>')
+      .bindPopup('<strong>' + {{ leg.from_port | tojson }} + '</strong><br><small>{{ leg.date }}</small>')
       .addTo(map);
     L.circleMarker(last{{ idx }}, { radius: 5, fillColor: COLORS[{{ idx }} % COLORS.length], color: '#333', weight: 1.5, fillOpacity: 1 })
-      .bindPopup('<strong>{{ leg.to_port }}</strong><br><small>{{ leg.date }}</small>')
+      .bindPopup('<strong>' + {{ leg.to_port | tojson }} + '</strong><br><small>{{ leg.date }}</small>')
       .addTo(map);
 
     pts{{ idx }}.forEach(p => allLatLons.push(p));

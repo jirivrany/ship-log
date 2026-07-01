@@ -62,7 +62,7 @@ def parse_fit_metadata(path: str, filename: str) -> FitMeta:
         # Derive timezone from session start position
         lat_sc = fields.get("start_position_lat")
         lon_sc = fields.get("start_position_long")
-        if lat_sc and lon_sc:
+        if lat_sc is not None and lon_sc is not None:
             lat = _sc(lat_sc)
             lon = _sc(lon_sc)
             found = _tf.timezone_at(lat=lat, lng=lon)
@@ -76,7 +76,7 @@ def parse_fit_metadata(path: str, filename: str) -> FitMeta:
             fields = {f.name: f.value for f in msg.fields if f.value is not None}
             lat_sc = fields.get("position_lat")
             lon_sc = fields.get("position_long")
-            if lat_sc and lon_sc:
+            if lat_sc is not None and lon_sc is not None:
                 found = _tf.timezone_at(lat=_sc(lat_sc), lng=_sc(lon_sc))
                 if found:
                     tz_name = found
