@@ -19,21 +19,28 @@
   <div>
     <div class="text-muted small">Motor</div>
     <div class="fs-5 fw-bold">{{ voyage_stats.motor_nm }} Nm</div>
+    <div class="text-muted small">{{ voyage_stats.motor_hhmm }}</div>
   </div>
   {% endif %}
   {% if voyage_stats.sail_nm > 0 %}
   <div>
     <div class="text-muted small">Sail</div>
     <div class="fs-5 fw-bold">{{ voyage_stats.sail_nm }} Nm</div>
+    <div class="text-muted small">{{ voyage_stats.sail_hhmm }}</div>
   </div>
   {% endif %}
   {% if voyage_stats.both_nm > 0 %}
   <div>
     <div class="text-muted small">Motor + sail</div>
     <div class="fs-5 fw-bold">{{ voyage_stats.both_nm }} Nm</div>
+    <div class="text-muted small">{{ voyage_stats.both_hhmm }}</div>
   </div>
   {% endif %}
   <div class="border-start ps-4">
+    <div class="text-muted small">Time</div>
+    <div class="fs-5 fw-bold">{{ voyage_stats.duration_hhmm }}</div>
+  </div>
+  <div>
     <div class="text-muted small">Legs</div>
     <div class="fs-5 fw-bold">{{ legs | length }}</div>
   </div>
