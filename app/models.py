@@ -16,6 +16,7 @@ class EntrySource(str, Enum):
     lap = "lap"
     hourly = "hourly"
     manual = "manual"
+    quick_note = "quick_note"
 
 
 class Voyage(SQLModel, table=True):
@@ -68,8 +69,8 @@ class LogEntry(SQLModel, table=True):
     leg_id: int = Field(foreign_key="leg.id")
 
     timestamp: datetime
-    lat: float
-    lon: float
+    lat: Optional[float] = None
+    lon: Optional[float] = None
     source: EntrySource
     course: Optional[float] = None       # COG degrees
     speed: Optional[float] = None        # SOG knots

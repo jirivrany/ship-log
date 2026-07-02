@@ -59,3 +59,4 @@ Thumbs.db
 
 # App data (SQLite DB and uploaded FIT files — persisted via bind mount, not in repo)
 data/
+data-verify/

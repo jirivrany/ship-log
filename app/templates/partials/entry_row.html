@@ -1,6 +1,6 @@
 <tr id="entry-{{ entry.id }}" class="log-row log-row--{{ entry.source.value }}">
   <td>{{ local_time }}</td>
-  <td class="coords">{{ "%.4f"|format(entry.lat) }}, {{ "%.4f"|format(entry.lon) }}</td>
+  <td class="coords">{% if entry.lat is not none and entry.lon is not none %}{{ "%.4f"|format(entry.lat) }}, {{ "%.4f"|format(entry.lon) }}{% else %}—{% endif %}</td>
   <td>{{ entry.course | int if entry.course else '—' }}</td>
   <td>{{ "%.1f"|format(entry.speed) if entry.speed else '—' }}</td>
   <td>{{ "%.1f"|format(entry.log_value) if entry.log_value else '—' }}</td>

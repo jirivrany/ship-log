@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Start Leg — {{ voyage.name }}{% endblock %}
+
+{% block content %}
+<a href="/voyages/{{ voyage.id }}" class="text-muted small text-decoration-none">← {{ voyage.name }}</a>
+<h1 class="h3 mt-1 mb-4">Start Leg</h1>
+
+<div class="card p-4" style="max-width:480px">
+  <form action="/voyages/{{ voyage.id }}/legs/quick" method="post">
+    <div class="row g-3 mb-3">
+      <div class="col-md-6">
+        <label class="form-label">From Port</label>
+        <input type="text" class="form-control form-control-sm" name="from_port" placeholder="e.g. Sukošan" required>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">To Port</label>
+        <input type="text" class="form-control form-control-sm" name="to_port" placeholder="e.g. Ždrelac" required>
+      </div>
+    </div>
+    <div class="row g-3 mb-3">
+      <div class="col-md-6">
+        <label class="form-label">Date</label>
+        <input type="date" class="form-control form-control-sm" name="date" id="date-input" required>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Timezone</label>
+        <input type="text" class="form-control form-control-sm" name="timezone" id="tz-input" placeholder="e.g. Europe/Zagreb" required>
+        <div class="form-text">Detected from your browser — override if needed</div>
+      </div>
+    </div>
+    <div class="d-flex gap-2">
+      <button type="submit" class="btn btn-primary">Start Leg</button>
+      <a href="/voyages/{{ voyage.id }}" class="btn btn-secondary">Cancel</a>
+    </div>
+  </form>
+</div>
+
+<script>
+  document.getElementById('date-input').valueAsDate = new Date();
+  document.getElementById('tz-input').value = Intl.DateTimeFormat().resolvedOptions().timeZone;
+</script>
+{% endblock %}
