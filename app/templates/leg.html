@@ -40,16 +40,25 @@
 <div class="mb-4">
   <h2 class="h5 mb-2">Notes</h2>
   {% if local_notes %}
-  <div class="d-flex flex-column gap-2">
-    {% for entry, local_time in local_notes %}
-    <div class="card p-3">
-      <div class="d-flex justify-content-between text-muted small mb-1">
-        <span>{{ local_time }}</span>
-        <span>{% if entry.lat is not none and entry.lon is not none %}{{ "%.4f"|format(entry.lat) }}, {{ "%.4f"|format(entry.lon) }}{% else %}no position{% endif %}</span>
-      </div>
-      <div>{{ entry.notes }}</div>
-    </div>
-    {% endfor %}
+  <div class="table-responsive border rounded">
+    <table class="table table-sm table-hover mb-0">
+      <thead class="table-light">
+        <tr>
+          <th style="width:1%">Time</th>
+          <th style="width:1%">Position</th>
+          <th>Note</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for entry, local_time in local_notes %}
+        <tr>
+          <td class="text-nowrap">{{ local_time }}</td>
+          <td class="text-nowrap">{% if entry.lat is not none and entry.lon is not none %}{{ "%.4f"|format(entry.lat) }}, {{ "%.4f"|format(entry.lon) }}{% else %}—{% endif %}</td>
+          <td style="white-space:normal">{{ entry.notes }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
   </div>
   {% else %}
   <p class="text-muted small">No notes yet — use "Quick Note" above, or add a note on any log entry below.</p>
