@@ -1,8 +1,7 @@
 from datetime import datetime, timedelta, timezone
 
 from app.models import EntrySource
-from app.processors.fit_track import ProcessedTrack, TrackPoint
-from app.processors.fit import LapPoint
+from app.processors.track import LapPoint, ProcessedTrack, TrackPoint
 from app.processors.merge import build_log_entries
 
 

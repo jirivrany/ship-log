@@ -11,6 +11,12 @@ class PropulsionType(str, Enum):
     anchor = "anchor"
 
 
+class TrackSource(str, Enum):
+    fit = "fit"
+    gpx = "gpx"
+    strava = "strava"
+
+
 class EntrySource(str, Enum):
     turning_point = "turning_point"
     lap = "lap"
@@ -58,7 +64,9 @@ class Leg(SQLModel, table=True):
     to_port: str
     date: str  # ISO date string YYYY-MM-DD
     timezone: str = "UTC"  # IANA tz name derived from first GPS point
-    fit_path: Optional[str] = None
+    track_path: Optional[str] = None          # source file on disk (FIT/GPX/Strava stream JSON)
+    track_source: Optional[TrackSource] = None
+    strava_activity_id: Optional[int] = None  # set for Strava imports; used for duplicate detection
 
     voyage: Optional[Voyage] = Relationship(back_populates="legs")
     log_entries: list["LogEntry"] = Relationship(back_populates="leg")

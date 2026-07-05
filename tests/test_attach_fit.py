@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 
 from app.models import EntrySource
-from app.processors.fit_track import ProcessedTrack, TrackPoint
+from app.processors.track import ProcessedTrack, TrackPoint
 from app.processors.merge import build_log_entries
 from app.processors.notes import create_quick_note
 

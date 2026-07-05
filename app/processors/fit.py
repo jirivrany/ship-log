@@ -6,16 +6,11 @@ from typing import Optional
 import fitparse
 from timezonefinder import TimezoneFinder
 
+from app.processors.track import LapPoint
+
 _tf = TimezoneFinder()
 
 SEMICIRCLE_TO_DEG = 180.0 / (2**31)
-
-
-@dataclass
-class LapPoint:
-    timestamp: datetime
-    lat: float
-    lon: float
 
 
 @dataclass

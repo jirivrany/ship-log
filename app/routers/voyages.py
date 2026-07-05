@@ -114,11 +114,11 @@ def voyage_detail(voyage_id: int, request: Request, session: Session = Depends(g
 
 
 def _load_leg_track(leg: Leg) -> list[dict]:
-    """Return [[lat, lon], ...] for the full leg track, or [] if no FIT file."""
-    if not leg.fit_path:
+    """Return [[lat, lon], ...] for the full leg track, or [] if no track file."""
+    if not leg.track_path:
         return []
     try:
-        track = parse_fit_track(leg.fit_path)
+        track = parse_fit_track(leg.track_path)
     except Exception:
         return []
     return [[pt.lat, pt.lon] for pt in track.track_points]

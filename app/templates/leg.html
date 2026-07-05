@@ -21,7 +21,7 @@
 <div class="d-flex align-items-center gap-3 mb-4 flex-wrap">
   <p class="text-muted mb-0">{{ leg.date }}</p>
   <a href="/legs/{{ leg.id }}/quick-note" class="btn btn-outline-primary btn-sm">+ Quick Note</a>
-  {% if not leg.fit_path %}
+  {% if not leg.track_path %}
   <a href="/legs/{{ leg.id }}/attach-fit" class="btn btn-outline-secondary btn-sm">Attach FIT file</a>
   {% endif %}
 </div>

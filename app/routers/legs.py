@@ -9,7 +9,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlmodel import Session, select
 
 from app.database import get_session
-from app.models import Leg, LogEntry, PropulsionType, Voyage
+from app.models import Leg, LogEntry, PropulsionType, TrackSource, Voyage
 from app.processors.fit import parse_fit_metadata, parse_fit_laps
 from app.processors.fit_track import parse_fit_track
 from app.processors.merge import build_log_entries
@@ -104,7 +104,7 @@ def create_leg_quick(
         to_port=to_port,
         date=date,
         timezone=timezone,
-        fit_path=None,
+        track_path=None,
     )
     session.add(leg)
     session.commit()
@@ -181,7 +181,8 @@ async def create_leg(
         to_port=to_port,
         date=date,
         timezone=timezone,
-        fit_path=final_path,
+        track_path=final_path,
+        track_source=TrackSource.fit,
     )
     session.add(leg)
     session.commit()
@@ -269,7 +270,8 @@ async def attach_fit(
     shutil.move(fit_path, final_path)
 
     meta = parse_fit_metadata(final_path, filename)
-    leg.fit_path = final_path
+    leg.track_path = final_path
+    leg.track_source = TrackSource.fit
     leg.timezone = meta.timezone
     session.add(leg)
     session.commit()
@@ -305,7 +307,7 @@ def leg_detail(leg_id: int, request: Request, session: Session = Depends(get_ses
         local_time = e.timestamp.astimezone(tz).strftime("%H:%M")
         local_entries.append((e, local_time))
 
-    track_points = _load_track_points(leg.fit_path) if leg.fit_path else []
+    track_points = _load_track_points(leg.track_path) if leg.track_path else []
     stats = _compute_leg_stats(entries)
 
     note_entries = filter_note_entries(entries)
@@ -483,10 +485,10 @@ def delete_leg(leg_id: int, session: Session = Depends(get_session)):
     return HTMLResponse("")
 
 
-def _load_track_points(fit_path: str) -> list[dict]:
+def _load_track_points(track_path: str) -> list[dict]:
     """Return sampled track points for map rendering and manual entry creation."""
     try:
-        track = parse_fit_track(fit_path)
+        track = parse_fit_track(track_path)
     except Exception:
         return []
     result = []
