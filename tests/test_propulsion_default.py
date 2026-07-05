@@ -67,7 +67,7 @@ def staged_fit(voyage_id):
     return str(dest)
 
 
-def _create_leg(client, voyage_id, fit_path, default_propulsion=None):
+def _create_leg(client, voyage_id, track_path, default_propulsion=None):
     # app.main.os.makedirs is patched to a no-op by the `client` fixture (it
     # guards the lifespan startup mkdir), so create_leg's own leg_dir mkdir
     # is a no-op too — pre-create the destination dir the test will move into.
@@ -79,7 +79,7 @@ def _create_leg(client, voyage_id, fit_path, default_propulsion=None):
         "to_port": "Ždrelac",
         "date": "2026-06-20",
         "timezone": "Europe/Zagreb",
-        "fit_path": fit_path,
+        "track_path": track_path,
     }
     if default_propulsion is not None:
         data["default_propulsion"] = default_propulsion

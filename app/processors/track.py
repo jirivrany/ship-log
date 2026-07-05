@@ -41,6 +41,17 @@ class LapPoint:
 
 
 @dataclass
+class TrackMeta:
+    """Prefill metadata extracted from a track file + its filename."""
+    date: str                    # YYYY-MM-DD (local calendar date)
+    from_port: Optional[str]
+    to_port: Optional[str]
+    total_distance_nm: Optional[float]
+    start_time: Optional[datetime]
+    timezone: str                # IANA name e.g. "Europe/Zagreb"
+
+
+@dataclass
 class TrackPoint:
     timestamp: datetime
     lat: float

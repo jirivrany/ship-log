@@ -6,7 +6,7 @@ from sqlmodel import Session, select
 
 from app.database import get_session
 from app.models import Leg, LogEntry, Voyage
-from app.processors.fit_track import parse_fit_track
+from app.processors import loader
 from app.stats import compute_stats
 from app.templates_env import templates
 
@@ -118,7 +118,7 @@ def _load_leg_track(leg: Leg) -> list[dict]:
     if not leg.track_path:
         return []
     try:
-        track = parse_fit_track(leg.track_path)
+        track = loader.parse_track(leg.track_path)
     except Exception:
         return []
     return [[pt.lat, pt.lon] for pt in track.track_points]

@@ -1,4 +1,4 @@
-"""Security tests for fit_path validation and port name sanitisation in create_leg."""
+"""Security tests for track_path validation and port name sanitisation in create_leg."""
 import os
 import pathlib
 import tempfile
@@ -60,7 +60,7 @@ def staged_fit(voyage_id):
     return str(fit_file)
 
 
-def _post_create_leg(client, voyage_id, fit_path, from_port="Sukošan", to_port="Ždrelac"):
+def _post_create_leg(client, voyage_id, track_path, from_port="Sukošan", to_port="Ždrelac"):
     return client.post(
         f"/voyages/{voyage_id}/legs",
         data={
@@ -68,12 +68,12 @@ def _post_create_leg(client, voyage_id, fit_path, from_port="Sukošan", to_port=
             "to_port": to_port,
             "date": "2026-06-20",
             "timezone": "Europe/Zagreb",
-            "fit_path": fit_path,
+            "track_path": track_path,
         },
     )
 
 
-# --- fit_path traversal ---
+# --- track_path traversal ---
 
 def test_fit_path_outside_staging_rejected(client, voyage_id):
     with tempfile.NamedTemporaryFile(delete=False) as f:

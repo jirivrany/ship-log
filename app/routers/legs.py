@@ -9,9 +9,8 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlmodel import Session, select
 
 from app.database import get_session
-from app.models import Leg, LogEntry, PropulsionType, TrackSource, Voyage
-from app.processors.fit import parse_fit_metadata, parse_fit_laps
-from app.processors.fit_track import parse_fit_track
+from app.models import Leg, LogEntry, PropulsionType, Voyage
+from app.processors import loader
 from app.processors.merge import build_log_entries
 from app.processors.notes import create_quick_note, filter_note_entries
 from app.stats import compute_stats
@@ -32,18 +31,18 @@ def _save_upload(file: UploadFile, dest_dir: str) -> str:
 
 def _generate_gps_entries(
     leg_id: int,
-    fit_path: str,
+    track_path: str,
     default_propulsion: str,
     default_wind_direction: Optional[str],
     default_wind_force: Optional[str],
 ) -> list[LogEntry]:
-    """Parse a FIT file and build the GPS-derived LogEntry rows for a leg,
-    applying prefill defaults. Does not touch any pre-existing entries on
-    the leg — build_log_entries() only knows about the FIT track/laps."""
-    track = parse_fit_track(fit_path)
+    """Parse a track file (FIT or GPX) and build the GPS-derived LogEntry rows
+    for a leg, applying prefill defaults. Does not touch any pre-existing
+    entries on the leg — build_log_entries() only knows about the track/laps."""
+    track = loader.parse_track(track_path)
     laps = []
     try:
-        laps = parse_fit_laps(fit_path)
+        laps = loader.parse_laps(track_path)
     except Exception:
         pass
 
@@ -117,24 +116,26 @@ def create_leg_quick(
 async def preview_leg(
     voyage_id: int,
     request: Request,
-    fit_file: UploadFile = File(...),
+    track_file: UploadFile = File(...),
     session: Session = Depends(get_session),
 ):
-    """Upload FIT, parse metadata, return pre-filled confirmation form."""
+    """Upload a track file (FIT/GPX), parse metadata, return pre-filled confirmation form."""
     voyage = session.get(Voyage, voyage_id)
     if not voyage:
         return HTMLResponse("Not found", status_code=404)
+    if not track_file.filename.lower().endswith(loader.TRACK_EXTENSIONS):
+        return HTMLResponse("Unsupported file type — upload a .fit or .gpx file", status_code=400)
 
     staging_dir = os.path.join(UPLOAD_DIR, "staging", f"voyage_{voyage_id}")
-    fit_path = _save_upload(fit_file, staging_dir)
-    meta = parse_fit_metadata(fit_path, fit_file.filename)
+    track_path = _save_upload(track_file, staging_dir)
+    meta = loader.parse_metadata(track_path, track_file.filename)
 
     return templates.TemplateResponse("leg_confirm.html", {
         "request": request,
         "voyage": voyage,
         "meta": meta,
-        "fit_path": fit_path,
-        "fit_filename": fit_file.filename,
+        "track_path": track_path,
+        "track_filename": track_file.filename,
         "propulsion_types": list(PropulsionType),
     })
 
@@ -146,7 +147,7 @@ async def create_leg(
     to_port: str = Form(...),
     date: str = Form(...),
     timezone: str = Form("UTC"),
-    fit_path: str = Form(...),
+    track_path: str = Form(...),
     # prefill defaults applied to all generated entries
     default_propulsion: str = Form("motor"),
     default_wind_direction: Optional[str] = Form(None),
@@ -157,10 +158,10 @@ async def create_leg(
     if not voyage:
         return HTMLResponse("Voyage not found", status_code=404)
 
-    # Validate fit_path is inside the staging area for this voyage
+    # Validate track_path is inside the staging area for this voyage
     staging_dir = pathlib.Path(UPLOAD_DIR, "staging", f"voyage_{voyage_id}").resolve()
-    real_fit = pathlib.Path(fit_path).resolve()
-    if not str(real_fit).startswith(str(staging_dir) + os.sep):
+    real_track = pathlib.Path(track_path).resolve()
+    if not str(real_track).startswith(str(staging_dir) + os.sep):
         raise HTTPException(status_code=400, detail="Invalid file path")
 
     # Validate leg_dir stays inside UPLOAD_DIR (guards against .. in port names)
@@ -171,9 +172,9 @@ async def create_leg(
 
     leg_dir = str(leg_dir_path)
     os.makedirs(leg_dir, exist_ok=True)
-    filename = os.path.basename(fit_path)
+    filename = os.path.basename(track_path)
     final_path = os.path.join(leg_dir, filename)
-    shutil.move(fit_path, final_path)
+    shutil.move(track_path, final_path)
 
     leg = Leg(
         voyage_id=voyage_id,
@@ -182,7 +183,7 @@ async def create_leg(
         date=date,
         timezone=timezone,
         track_path=final_path,
-        track_source=TrackSource.fit,
+        track_source=loader.source_for(final_path),
     )
     session.add(leg)
     session.commit()
@@ -198,8 +199,8 @@ async def create_leg(
     return RedirectResponse(f"/legs/{leg.id}", status_code=303)
 
 
-@router.get("/legs/{leg_id}/attach-fit", response_class=HTMLResponse)
-def attach_fit_form(leg_id: int, request: Request, session: Session = Depends(get_session)):
+@router.get("/legs/{leg_id}/attach-track", response_class=HTMLResponse)
+def attach_track_form(leg_id: int, request: Request, session: Session = Depends(get_session)):
     leg = session.get(Leg, leg_id)
     if not leg:
         return HTMLResponse("Not found", status_code=404)
@@ -210,38 +211,40 @@ def attach_fit_form(leg_id: int, request: Request, session: Session = Depends(ge
     })
 
 
-@router.post("/legs/{leg_id}/attach-fit/preview", response_class=HTMLResponse)
-async def attach_fit_preview(
+@router.post("/legs/{leg_id}/attach-track/preview", response_class=HTMLResponse)
+async def attach_track_preview(
     leg_id: int,
     request: Request,
-    fit_file: UploadFile = File(...),
+    track_file: UploadFile = File(...),
     session: Session = Depends(get_session),
 ):
-    """Upload FIT for an existing (trackless) leg, parse metadata, return
-    pre-filled confirmation form."""
+    """Upload a track file (FIT/GPX) for an existing (trackless) leg, parse
+    metadata, return pre-filled confirmation form."""
     leg = session.get(Leg, leg_id)
     if not leg:
         return HTMLResponse("Not found", status_code=404)
+    if not track_file.filename.lower().endswith(loader.TRACK_EXTENSIONS):
+        return HTMLResponse("Unsupported file type — upload a .fit or .gpx file", status_code=400)
 
     staging_dir = os.path.join(UPLOAD_DIR, "staging", f"leg_{leg_id}")
-    fit_path = _save_upload(fit_file, staging_dir)
-    meta = parse_fit_metadata(fit_path, fit_file.filename)
+    track_path = _save_upload(track_file, staging_dir)
+    meta = loader.parse_metadata(track_path, track_file.filename)
 
     return templates.TemplateResponse("leg_confirm.html", {
         "request": request,
         "voyage": leg.voyage,
         "meta": meta,
-        "fit_path": fit_path,
-        "fit_filename": fit_file.filename,
+        "track_path": track_path,
+        "track_filename": track_file.filename,
         "propulsion_types": list(PropulsionType),
         "attach_leg": leg,
     })
 
 
-@router.post("/legs/{leg_id}/attach-fit")
-async def attach_fit(
+@router.post("/legs/{leg_id}/attach-track")
+async def attach_track(
     leg_id: int,
-    fit_path: str = Form(...),
+    track_path: str = Form(...),
     default_propulsion: str = Form("motor"),
     default_wind_direction: Optional[str] = Form(None),
     default_wind_force: Optional[str] = Form(None),
@@ -251,10 +254,10 @@ async def attach_fit(
     if not leg:
         return HTMLResponse("Not found", status_code=404)
 
-    # Validate fit_path is inside this leg's staging area
+    # Validate track_path is inside this leg's staging area
     staging_dir = pathlib.Path(UPLOAD_DIR, "staging", f"leg_{leg_id}").resolve()
-    real_fit = pathlib.Path(fit_path).resolve()
-    if not str(real_fit).startswith(str(staging_dir) + os.sep):
+    real_track = pathlib.Path(track_path).resolve()
+    if not str(real_track).startswith(str(staging_dir) + os.sep):
         raise HTTPException(status_code=400, detail="Invalid file path")
 
     # Validate leg_dir stays inside UPLOAD_DIR (guards against .. in stored port names)
@@ -265,13 +268,13 @@ async def attach_fit(
 
     leg_dir = str(leg_dir_path)
     os.makedirs(leg_dir, exist_ok=True)
-    filename = os.path.basename(fit_path)
+    filename = os.path.basename(track_path)
     final_path = os.path.join(leg_dir, filename)
-    shutil.move(fit_path, final_path)
+    shutil.move(track_path, final_path)
 
-    meta = parse_fit_metadata(final_path, filename)
+    meta = loader.parse_metadata(final_path, filename)
     leg.track_path = final_path
-    leg.track_source = TrackSource.fit
+    leg.track_source = loader.source_for(final_path)
     leg.timezone = meta.timezone
     session.add(leg)
     session.commit()
@@ -488,7 +491,7 @@ def delete_leg(leg_id: int, session: Session = Depends(get_session)):
 def _load_track_points(track_path: str) -> list[dict]:
     """Return sampled track points for map rendering and manual entry creation."""
     try:
-        track = parse_fit_track(track_path)
+        track = loader.parse_track(track_path)
     except Exception:
         return []
     result = []
