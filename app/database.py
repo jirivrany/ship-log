@@ -31,6 +31,13 @@ def migrate_schema(target_engine) -> None:
         if "strava_activity_id" not in cols:
             conn.exec_driver_sql("ALTER TABLE leg ADD COLUMN strava_activity_id INTEGER")
 
+        # 2026-07: voyage start/end dates (drive Strava import window) + skipper
+        voyage_cols = {row[1] for row in conn.exec_driver_sql("PRAGMA table_info(voyage)").fetchall()}
+        if voyage_cols:
+            for col in ("start_date", "end_date", "skipper"):
+                if col not in voyage_cols:
+                    conn.exec_driver_sql(f"ALTER TABLE voyage ADD COLUMN {col} VARCHAR")
+
         conn.commit()
 
 

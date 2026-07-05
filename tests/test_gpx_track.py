@@ -15,7 +15,7 @@ from app.database import get_session
 from app.models import Leg, LogEntry, TrackSource, Voyage
 from app.processors.gpx_track import (
     _ports_from_filename,
-    _ports_from_name,
+    ports_from_name,
     parse_gpx_metadata,
     parse_gpx_track,
 )
@@ -70,13 +70,13 @@ def test_parse_real_gpx_metadata():
 # --- port name parsing ---
 
 def test_ports_from_name_matches_from_to():
-    assert _ports_from_name("Zadar - Muline") == ("Zadar", "Muline")
-    assert _ports_from_name("Zadar – Muline") == ("Zadar", "Muline")  # en dash
+    assert ports_from_name("Zadar - Muline") == ("Zadar", "Muline")
+    assert ports_from_name("Zadar – Muline") == ("Zadar", "Muline")  # en dash
 
 
 def test_ports_from_name_rejects_auto_titles():
-    assert _ports_from_name("Bibinje Plavba lodí") == (None, None)
-    assert _ports_from_name(None) == (None, None)
+    assert ports_from_name("Bibinje Plavba lodí") == (None, None)
+    assert ports_from_name(None) == (None, None)
 
 
 def test_ports_from_filename():

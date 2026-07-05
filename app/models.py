@@ -28,6 +28,8 @@ class EntrySource(str, Enum):
 class Voyage(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str                               # voyage name e.g. "Chorvatsko 2026"
+    start_date: Optional[str] = None        # ISO date YYYY-MM-DD (charter start)
+    end_date: Optional[str] = None          # ISO date YYYY-MM-DD (charter end)
 
     # Boat identification (PDF: front page header)
     boat: str                               # Jméno/typ jachty
@@ -35,6 +37,7 @@ class Voyage(SQLModel, table=True):
     home_port: Optional[str] = None             # Domovský přístav
     call_sign: Optional[str] = None             # Volací značka
     owner: Optional[str] = None                 # Vlastník
+    skipper: Optional[str] = None               # Kapitán
     crew: Optional[str] = None                  # crew names
 
     # Boat technical specs (PDF: Hlavní údaje o plavidle)

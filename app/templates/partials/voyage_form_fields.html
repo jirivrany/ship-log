@@ -1,0 +1,106 @@
+{# Shared voyage form fields — used by the create form (no `v`) and the
+   edit form (`v` = existing Voyage, values pre-filled). #}
+{% set v = v | default(none) %}
+<h6 class="text-uppercase text-muted fw-semibold mb-3 border-bottom pb-2">Voyage</h6>
+<div class="row g-3 mb-3">
+  <div class="col-md-6">
+    <label class="form-label">Voyage name <span class="text-danger">*</span></label>
+    <input type="text" class="form-control" name="name" placeholder="Chorvatsko 2026" value="{{ v.name or '' }}" required>
+  </div>
+  <div class="col-md-3">
+    <label class="form-label">Start date</label>
+    <input type="date" class="form-control" name="start_date" value="{{ v.start_date or '' }}">
+  </div>
+  <div class="col-md-3">
+    <label class="form-label">End date</label>
+    <input type="date" class="form-control" name="end_date" value="{{ v.end_date or '' }}">
+  </div>
+</div>
+
+<h6 class="text-uppercase text-muted fw-semibold mb-3 border-bottom pb-2">Boat identification</h6>
+<div class="row g-3 mb-3">
+  <div class="col-md-4">
+    <label class="form-label">Boat name / type <span class="text-danger">*</span></label>
+    <input type="text" class="form-control" name="boat" placeholder="Bavaria Cruiser 34" value="{{ v.boat or '' }}" required>
+  </div>
+  <div class="col-md-4">
+    <label class="form-label">Registration number</label>
+    <input type="text" class="form-control" name="registration_number" value="{{ v.registration_number or '' }}">
+  </div>
+  <div class="col-md-4">
+    <label class="form-label">Home port</label>
+    <input type="text" class="form-control" name="home_port" value="{{ v.home_port or '' }}">
+  </div>
+  <div class="col-md-4">
+    <label class="form-label">Call sign</label>
+    <input type="text" class="form-control" name="call_sign" value="{{ v.call_sign or '' }}">
+  </div>
+  <div class="col-md-4">
+    <label class="form-label">Owner</label>
+    <input type="text" class="form-control" name="owner" value="{{ v.owner or '' }}">
+  </div>
+  <div class="col-md-4">
+    <label class="form-label">Skipper</label>
+    <input type="text" class="form-control" name="skipper" value="{{ v.skipper or '' }}">
+  </div>
+  <div class="col-md-4">
+    <label class="form-label">Crew</label>
+    <input type="text" class="form-control" name="crew" placeholder="Names" value="{{ v.crew or '' }}">
+  </div>
+</div>
+
+<h6 class="text-uppercase text-muted fw-semibold mb-3 border-bottom pb-2">Boat specifications</h6>
+<div class="row g-3 mb-3">
+  <div class="col-6 col-md-3">
+    <label class="form-label">Length (m)</label>
+    <input type="number" class="form-control" name="length_m" step="0.01" value="{{ v.length_m or '' }}">
+  </div>
+  <div class="col-6 col-md-3">
+    <label class="form-label">Beam (m)</label>
+    <input type="number" class="form-control" name="beam_m" step="0.01" value="{{ v.beam_m or '' }}">
+  </div>
+  <div class="col-6 col-md-3">
+    <label class="form-label">Draft (m)</label>
+    <input type="number" class="form-control" name="draft_m" step="0.01" value="{{ v.draft_m or '' }}">
+  </div>
+  <div class="col-6 col-md-3">
+    <label class="form-label">Air draft (m)</label>
+    <input type="number" class="form-control" name="air_draft_m" step="0.01" value="{{ v.air_draft_m or '' }}">
+  </div>
+  <div class="col-6 col-md-3">
+    <label class="form-label">Engine type</label>
+    <input type="text" class="form-control" name="engine_type" value="{{ v.engine_type or '' }}">
+  </div>
+  <div class="col-6 col-md-3">
+    <label class="form-label">Engine power (kW)</label>
+    <input type="number" class="form-control" name="engine_power_kw" step="0.1" value="{{ v.engine_power_kw or '' }}">
+  </div>
+  <div class="col-6 col-md-3">
+    <label class="form-label">Displacement (t)</label>
+    <input type="number" class="form-control" name="displacement_t" step="0.01" value="{{ v.displacement_t or '' }}">
+  </div>
+  <div class="col-6 col-md-3">
+    <label class="form-label">Max persons</label>
+    <input type="number" class="form-control" name="max_persons" min="1" value="{{ v.max_persons or '' }}">
+  </div>
+  <div class="col-6 col-md-3">
+    <label class="form-label">Total sail area (m²)</label>
+    <input type="number" class="form-control" name="sail_area_m2" step="0.1" value="{{ v.sail_area_m2 or '' }}">
+  </div>
+  <div class="col-6 col-md-3">
+    <label class="form-label">Mainsail (m²)</label>
+    <input type="number" class="form-control" name="mainsail_m2" step="0.1" value="{{ v.mainsail_m2 or '' }}">
+  </div>
+  <div class="col-6 col-md-3">
+    <label class="form-label">Genoa (m²)</label>
+    <input type="number" class="form-control" name="genoa_m2" step="0.1" value="{{ v.genoa_m2 or '' }}">
+  </div>
+  <div class="col-6 col-md-3">
+    <label class="form-label">Water tank (l)</label>
+    <input type="number" class="form-control" name="water_tank_l" value="{{ v.water_tank_l or '' }}">
+  </div>
+  <div class="col-6 col-md-3">
+    <label class="form-label">Fuel tank (l)</label>
+    <input type="number" class="form-control" name="fuel_tank_l" value="{{ v.fuel_tank_l or '' }}">
+  </div>
+</div>

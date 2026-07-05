@@ -148,6 +148,7 @@ async def create_leg(
     date: str = Form(...),
     timezone: str = Form("UTC"),
     track_path: str = Form(...),
+    strava_activity_id: Optional[int] = Form(None),
     # prefill defaults applied to all generated entries
     default_propulsion: str = Form("motor"),
     default_wind_direction: Optional[str] = Form(None),
@@ -184,6 +185,7 @@ async def create_leg(
         timezone=timezone,
         track_path=final_path,
         track_source=loader.source_for(final_path),
+        strava_activity_id=strava_activity_id,
     )
     session.add(leg)
     session.commit()
@@ -245,6 +247,7 @@ async def attach_track_preview(
 async def attach_track(
     leg_id: int,
     track_path: str = Form(...),
+    strava_activity_id: Optional[int] = Form(None),
     default_propulsion: str = Form("motor"),
     default_wind_direction: Optional[str] = Form(None),
     default_wind_force: Optional[str] = Form(None),
@@ -275,6 +278,7 @@ async def attach_track(
     meta = loader.parse_metadata(final_path, filename)
     leg.track_path = final_path
     leg.track_source = loader.source_for(final_path)
+    leg.strava_activity_id = strava_activity_id
     leg.timezone = meta.timezone
     session.add(leg)
     session.commit()

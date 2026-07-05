@@ -15,11 +15,25 @@ CREATE TABLE leg (
 )
 """
 
+OLD_VOYAGE_SCHEMA = """
+CREATE TABLE voyage (
+    id INTEGER PRIMARY KEY,
+    name VARCHAR NOT NULL,
+    boat VARCHAR NOT NULL,
+    crew VARCHAR,
+    created_at TIMESTAMP
+)
+"""
+
 
 def _old_db_engine(tmp_path):
     engine = create_engine(f"sqlite:///{tmp_path}/old.db")
     with engine.connect() as conn:
         conn.exec_driver_sql(OLD_SCHEMA)
+        conn.exec_driver_sql(OLD_VOYAGE_SCHEMA)
+        conn.exec_driver_sql(
+            "INSERT INTO voyage (name, boat, crew) VALUES ('Chorvatsko 2026', 'Bavaria', 'posádka')"
+        )
         conn.exec_driver_sql(
             "INSERT INTO leg (voyage_id, from_port, to_port, date, timezone, fit_path) "
             "VALUES (1, 'Sukošan', 'Ždrelac', '2026-06-20', 'Europe/Zagreb', '/app/data/uploads/x.fit'),"
@@ -50,6 +64,15 @@ def test_migrates_old_schema(tmp_path):
     assert rows[0] == ("/app/data/uploads/x.fit", "fit", None)
     # trackless quick-form leg: no source
     assert rows[1] == (None, None, None)
+
+    with engine.connect() as conn:
+        voyage_cols = {r[1] for r in conn.exec_driver_sql("PRAGMA table_info(voyage)").fetchall()}
+        row = conn.exec_driver_sql(
+            "SELECT name, crew, start_date, end_date, skipper FROM voyage"
+        ).fetchone()
+    assert {"start_date", "end_date", "skipper"} <= voyage_cols
+    # existing data untouched, new columns empty
+    assert row == ("Chorvatsko 2026", "posádka", None, None, None)
 
 
 def test_migration_is_idempotent(tmp_path):

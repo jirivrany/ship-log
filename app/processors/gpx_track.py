@@ -82,7 +82,7 @@ def parse_gpx_metadata(path: str, filename: str) -> TrackMeta:
     total_distance_nm = round(dist_m / 1852.0, 2) if dist_m else None
 
     track_name = gpx.tracks[0].name if gpx.tracks else None
-    from_port, to_port = _ports_from_name(track_name)
+    from_port, to_port = ports_from_name(track_name)
     if not (from_port and to_port):
         from_port, to_port = _ports_from_filename(filename)
 
@@ -96,7 +96,7 @@ def parse_gpx_metadata(path: str, filename: str) -> TrackMeta:
     )
 
 
-def _ports_from_name(name: Optional[str]) -> tuple[Optional[str], Optional[str]]:
+def ports_from_name(name: Optional[str]) -> tuple[Optional[str], Optional[str]]:
     """Split a 'From - To' track name; Garmin auto-titles won't match."""
     if not name:
         return None, None

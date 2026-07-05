@@ -17,6 +17,9 @@
       <input type="file" class="form-control form-control-sm" name="track_file" accept=".fit,.gpx" required>
       <div class="form-text">FIT or GPX — date and ports will be parsed automatically</div>
     </div>
+    {% if attach_leg %}
+    <p class="small text-muted mb-3">…or <a href="/legs/{{ attach_leg.id }}/strava">import this leg from Strava</a> instead</p>
+    {% endif %}
     <div class="d-flex gap-2">
       <button type="submit" class="btn btn-primary">Upload &amp; Preview</button>
       <a href="{% if attach_leg %}/legs/{{ attach_leg.id }}{% else %}/voyages/{{ voyage.id }}{% endif %}" class="btn btn-secondary">Cancel</a>

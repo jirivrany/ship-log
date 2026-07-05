@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Import from Strava — {{ voyage.name }}{% endblock %}
+
+{% block content %}
+{% if attach_leg %}
+<a href="{{ back_url }}" class="text-muted small text-decoration-none">← {{ attach_leg.from_port }} → {{ attach_leg.to_port }}</a>
+{% else %}
+<a href="{{ back_url }}" class="text-muted small text-decoration-none">← {{ voyage.name }}</a>
+{% endif %}
+<h1 class="h3 mt-1 mb-1">Import from Strava</h1>
+{% if voyage.start_date or voyage.end_date %}
+<p class="text-muted mb-4">Sailing activities {{ voyage.start_date or '…' }} → {{ voyage.end_date or '…' }} <span class="small">(voyage dates)</span></p>
+{% else %}
+<p class="text-muted mb-4">Recent sailing activities from your Strava timeline — set voyage start/end dates to reach older ones</p>
+{% endif %}
+
+{% if rows %}
+<div class="card">
+  <table class="table table-sm table-hover align-middle mb-0">
+    <thead>
+      <tr class="text-muted small">
+        <th class="ps-3">Date</th>
+        <th>Activity</th>
+        <th class="text-end">Distance</th>
+        <th class="text-end pe-3"></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in rows %}
+      <tr>
+        <td class="ps-3 text-nowrap">{{ row.date }}</td>
+        <td>{{ row.name }}</td>
+        <td class="text-end text-nowrap">{{ row.distance_nm }} Nm</td>
+        <td class="text-end pe-3" style="width:1%">
+          {% if row.imported_leg %}
+          <a href="/legs/{{ row.imported_leg.id }}" class="badge text-bg-success text-decoration-none">Imported →</a>
+          {% else %}
+          <form method="post" action="{{ post_base }}/{{ row.id }}/preview" class="d-inline">
+            <button type="submit" class="btn btn-outline-primary btn-sm">Import</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="card p-4 text-muted">No sailing activities found in your recent Strava timeline.</div>
+{% endif %}
+{% endblock %}

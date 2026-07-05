@@ -13,6 +13,9 @@
 <div class="card p-4">
   <form action="{% if attach_leg %}/legs/{{ attach_leg.id }}/attach-track{% else %}/voyages/{{ voyage.id }}/legs{% endif %}" method="post">
     <input type="hidden" name="track_path" value="{{ track_path }}">
+    {% if strava_activity_id %}
+    <input type="hidden" name="strava_activity_id" value="{{ strava_activity_id }}">
+    {% endif %}
 
     {% if not attach_leg %}
     <input type="hidden" name="timezone" value="{{ meta.timezone }}">
@@ -68,7 +71,7 @@
 
     <div class="d-flex gap-2">
       <button type="submit" class="btn btn-primary">Confirm &amp; Process</button>
-      <a href="{% if attach_leg %}/legs/{{ attach_leg.id }}/attach-track{% else %}/voyages/{{ voyage.id }}/legs/new{% endif %}" class="btn btn-secondary">Back</a>
+      <a href="{% if back_url %}{{ back_url }}{% elif attach_leg %}/legs/{{ attach_leg.id }}/attach-track{% else %}/voyages/{{ voyage.id }}/legs/new{% endif %}" class="btn btn-secondary">Back</a>
     </div>
   </form>
 </div>
