@@ -1,4 +1,18 @@
 """Historical weather for log entries: unit derivations + Open-Meteo client."""
+from dataclasses import dataclass
+from typing import Optional
+
+
+@dataclass
+class WeatherObservation:
+    """Weather at one log-entry position/hour, in the log's native units."""
+    wind_speed_kn: Optional[float] = None
+    wind_direction: Optional[str] = None      # 16-point sector, e.g. "SSW"
+    wind_force: Optional[int] = None          # Beaufort
+    air_temperature: Optional[float] = None   # °C
+    atmospheric_pressure: Optional[float] = None  # hPa, mean sea level
+    cloud_cover: Optional[int] = None         # oktas 0-8
+    sea_state: Optional[int] = None           # Douglas 0-9
 
 # WMO Beaufort scale: exclusive upper wind-speed bound (knots) per force 0-11
 # (force 4 is 11-16 kn, i.e. [11, 17)); >= 64 kn is force 12.

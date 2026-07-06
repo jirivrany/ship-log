@@ -108,15 +108,17 @@ class LogEntry(SQLModel, table=True):
     speed: Optional[float] = None        # SOG knots
     log_value: Optional[float] = None    # distance Nm from leg start
 
-    # manually filled
+    # manually filled (or prefilled by the weather fetch — see weather_source)
     propulsion: PropulsionType = Field(default=PropulsionType.motor)
     wind_direction: Optional[str] = None  # e.g. "NW" or "315"
     wind_force: Optional[int] = None      # Beaufort
+    wind_speed_kn: Optional[float] = None  # exact wind speed, knots
     sea_state: Optional[int] = None       # Beaufort
     visibility: Optional[str] = None
     cloud_cover: Optional[int] = None     # oktas 0-8
     atmospheric_pressure: Optional[float] = None
     air_temperature: Optional[float] = None  # pre-filled from Garmin if available
+    weather_source: Optional[str] = None  # "open-meteo" when auto-filled; None = observed
     notes: Optional[str] = None
 
     leg: Optional[Leg] = Relationship(back_populates="log_entries")
