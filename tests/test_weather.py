@@ -107,6 +107,20 @@ def test_missing_marine_data_leaves_sea_state_empty():
     assert obs[0].wind_speed_kn == 10.0
 
 
+def test_archive_failure_yields_no_observations():
+    client = _client_serving({}, [])  # every host answers 404
+
+    assert fetch_weather(KORNATI_POINTS, client=client) == [None, None, None]
+
+
+def test_network_timeout_yields_no_observations():
+    def handler(request):
+        raise httpx.ConnectTimeout("boom")
+    client = httpx.Client(transport=httpx.MockTransport(handler))
+
+    assert fetch_weather(KORNATI_POINTS, client=client) == [None, None, None]
+
+
 def test_moderate_breeze_is_4_bft():
     # WMO: 11-16 kn = force 4
     assert knots_to_beaufort(14.2) == 4

@@ -115,9 +115,14 @@ def fetch_weather(
     if own_client:
         client = httpx.Client(timeout=TIMEOUT_S)
     try:
-        response = client.get(ARCHIVE_URL, params=params)
-        response.raise_for_status()
-        data = response.json()
+        try:
+            response = client.get(ARCHIVE_URL, params=params)
+            response.raise_for_status()
+            data = response.json()
+        except httpx.HTTPError:
+            # No weather is a shrug, not an error: entries stay unfilled and
+            # the user can simply fetch again later.
+            return [None] * len(points)
 
         # Sea state is best-effort: the marine grid has no cells close to
         # shore, so a failure here must not cost the atmospheric data.
