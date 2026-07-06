@@ -6,6 +6,7 @@ from typing import Optional
 import httpx
 
 ARCHIVE_URL = "https://archive-api.open-meteo.com/v1/archive"
+MARINE_URL = "https://marine-api.open-meteo.com/v1/marine"
 HOURLY_VARS = "wind_speed_10m,wind_direction_10m,temperature_2m,pressure_msl,cloud_cover"
 GRID_DEG = 0.25   # ERA5 cell size: points are deduplicated onto this grid
 TIMEOUT_S = 10.0
@@ -117,19 +118,38 @@ def fetch_weather(
         response = client.get(ARCHIVE_URL, params=params)
         response.raise_for_status()
         data = response.json()
+
+        # Sea state is best-effort: the marine grid has no cells close to
+        # shore, so a failure here must not cost the atmospheric data.
+        marine_params = dict(params, hourly="wave_height")
+        marine_params.pop("wind_speed_unit")
+        try:
+            marine_response = client.get(MARINE_URL, params=marine_params)
+            marine_response.raise_for_status()
+            marine_data = marine_response.json()
+        except httpx.HTTPError:
+            marine_data = None
     finally:
         if own_client:
             client.close()
 
     locations = data if isinstance(data, list) else [data]
+    marine_locations: list = []
+    if isinstance(marine_data, list):
+        marine_locations = marine_data
+    elif isinstance(marine_data, dict) and "hourly" in marine_data:
+        marine_locations = [marine_data]
 
     observations: list[Optional[WeatherObservation]] = []
     for ts, lat, lon in points:
-        location = locations[cell_index[_grid_cell(lat, lon)]]
+        loc_i = cell_index[_grid_cell(lat, lon)]
+        location = locations[loc_i]
         hour = _nearest_hour_key(ts)
         wind_kn = _hourly_value(location, "wind_speed_10m", hour)
         wind_deg = _hourly_value(location, "wind_direction_10m", hour)
         cloud_pct = _hourly_value(location, "cloud_cover", hour)
+        wave_m = (_hourly_value(marine_locations[loc_i], "wave_height", hour)
+                  if loc_i < len(marine_locations) else None)
         observations.append(WeatherObservation(
             wind_speed_kn=wind_kn,
             wind_direction=degrees_to_sector(wind_deg) if wind_deg is not None else None,
@@ -137,5 +157,6 @@ def fetch_weather(
             air_temperature=_hourly_value(location, "temperature_2m", hour),
             atmospheric_pressure=_hourly_value(location, "pressure_msl", hour),
             cloud_cover=cloud_pct_to_oktas(cloud_pct) if cloud_pct is not None else None,
+            sea_state=wave_height_to_douglas(wave_m) if wave_m is not None else None,
         ))
     return observations

@@ -83,6 +83,30 @@ def test_fetch_matches_each_point_to_own_location_and_hour():
     assert obs[2].cloud_cover == 1
 
 
+def test_fetch_fills_sea_state_from_marine_api():
+    client = _client_serving({
+        "archive-api": _fixture("openmeteo_archive.json"),
+        "marine-api": _fixture("openmeteo_marine.json"),
+    }, [])
+
+    obs = fetch_weather(KORNATI_POINTS, client=client)
+
+    # wave heights: loc 0 @ 13:00 = 0.08 m, loc 1 @ 15:00 = 0.14 m
+    assert obs[0].sea_state == 1
+    assert obs[2].sea_state == 2
+
+
+def test_missing_marine_data_leaves_sea_state_empty():
+    # marine grid has no cell very close to shore -> 404/error there;
+    # the atmospheric values must still come through.
+    client = _client_serving({"archive-api": _fixture("openmeteo_archive.json")}, [])
+
+    obs = fetch_weather(KORNATI_POINTS, client=client)
+
+    assert obs[0].sea_state is None
+    assert obs[0].wind_speed_kn == 10.0
+
+
 def test_moderate_breeze_is_4_bft():
     # WMO: 11-16 kn = force 4
     assert knots_to_beaufort(14.2) == 4
