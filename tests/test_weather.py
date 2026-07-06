@@ -1,5 +1,5 @@
 """Weather derivations and Open-Meteo client (PRD: weather enrichment)."""
-from app.weather import knots_to_beaufort
+from app.weather import degrees_to_sector, knots_to_beaufort
 
 
 def test_moderate_breeze_is_4_bft():
@@ -21,3 +21,19 @@ def test_beaufort_wmo_boundaries():
     assert knots_to_beaufort(63.0) == 11
     assert knots_to_beaufort(64.0) == 12
     assert knots_to_beaufort(120.0) == 12  # hurricane caps at 12
+
+
+def test_cardinal_sectors_16_point():
+    assert degrees_to_sector(0) == "N"
+    assert degrees_to_sector(225) == "SW"
+    assert degrees_to_sector(202.5) == "SSW"
+    assert degrees_to_sector(45) == "NE"
+
+
+def test_sector_boundaries_and_wrap():
+    # Each sector is 22.5 deg wide, centred on its heading: N covers [348.75, 11.25).
+    assert degrees_to_sector(11.24) == "N"
+    assert degrees_to_sector(11.25) == "NNE"
+    assert degrees_to_sector(348.75) == "N"
+    assert degrees_to_sector(348.74) == "NNW"
+    assert degrees_to_sector(360) == "N"

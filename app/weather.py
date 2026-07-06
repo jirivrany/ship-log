@@ -10,3 +10,12 @@ def knots_to_beaufort(knots: float) -> int:
         if knots < upper:
             return force
     return 12
+
+
+_SECTORS = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE",
+            "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"]
+
+
+def degrees_to_sector(degrees: float) -> str:
+    """16-point compass sector; each spans 22.5 deg centred on its heading."""
+    return _SECTORS[int((degrees % 360) / 22.5 + 0.5) % 16]
