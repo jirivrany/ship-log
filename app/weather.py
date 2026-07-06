@@ -1,13 +1,12 @@
 """Historical weather for log entries: unit derivations + Open-Meteo client."""
 
-# WMO Beaufort scale: inclusive upper wind-speed bound (knots) per force 0-11,
-# applied to the speed rounded to whole knots; >= 64 kn is force 12.
-_BEAUFORT_MAX_KN = [0, 3, 6, 10, 16, 21, 27, 33, 40, 47, 55, 63]
+# WMO Beaufort scale: exclusive upper wind-speed bound (knots) per force 0-11
+# (force 4 is 11-16 kn, i.e. [11, 17)); >= 64 kn is force 12.
+_BEAUFORT_UPPER_KN = [1, 4, 7, 11, 17, 22, 28, 34, 41, 48, 56, 64]
 
 
 def knots_to_beaufort(knots: float) -> int:
-    kn = round(knots)
-    for force, upper in enumerate(_BEAUFORT_MAX_KN):
-        if kn <= upper:
+    for force, upper in enumerate(_BEAUFORT_UPPER_KN):
+        if knots < upper:
             return force
     return 12
