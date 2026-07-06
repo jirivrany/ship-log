@@ -49,6 +49,7 @@ class TrackMeta:
     total_distance_nm: Optional[float]
     start_time: Optional[datetime]
     timezone: str                # IANA name e.g. "Europe/Zagreb"
+    description: Optional[str] = None  # free-text summary, only Strava activities carry one
 
 
 @dataclass

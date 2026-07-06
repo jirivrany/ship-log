@@ -4,11 +4,14 @@ from typing import Optional
 from app.models import EntrySource, LogEntry
 
 
-def create_quick_note(leg_id: int, text: str, lat: Optional[float], lon: Optional[float]) -> LogEntry:
+def create_quick_note(
+    leg_id: int, text: str, lat: Optional[float], lon: Optional[float],
+    timestamp: Optional[datetime] = None,
+) -> LogEntry:
     """Build a quick-note LogEntry. Caller is responsible for persisting it."""
     return LogEntry(
         leg_id=leg_id,
-        timestamp=datetime.utcnow(),
+        timestamp=timestamp or datetime.utcnow(),
         lat=lat,
         lon=lon,
         source=EntrySource.quick_note,

@@ -87,11 +87,13 @@ def parse_strava_metadata(path: str, filename: str) -> TrackMeta:
 
     dist_m = activity.get("distance")
     from_port, to_port = ports_from_name(activity.get("name"))
+    description = (activity.get("description") or "").strip() or None
 
     return TrackMeta(
         date=date,
         from_port=from_port,
         to_port=to_port,
+        description=description,
         total_distance_nm=round(dist_m / 1852.0, 2) if dist_m else None,
         start_time=start_time,
         timezone=tz_name,

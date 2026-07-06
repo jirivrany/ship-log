@@ -23,7 +23,7 @@ needs_fixture = pytest.mark.skipif(
 )
 
 
-def _write_bundle(tmp_path, n=12, laps=None, null_fix_at=None):
+def _write_bundle(tmp_path, n=12, laps=None, null_fix_at=None, description=None):
     """Minimal bundle: one point every 30 s heading north at ~5 kn."""
     latlng = [[44.0 + i * 0.000694, 15.0] for i in range(n)]
     if null_fix_at is not None:
@@ -34,6 +34,7 @@ def _write_bundle(tmp_path, n=12, laps=None, null_fix_at=None):
             "name": "Sukošan - Ždrelac",
             "start_date": "2026-06-20T08:00:00Z",
             "distance": 5556.0,  # 3.0 Nm
+            "description": description,
         },
         "streams": {
             "time": {"data": [i * 30 for i in range(n)]},
@@ -83,6 +84,19 @@ def test_metadata_from_activity(tmp_path):
     assert meta.total_distance_nm == 3.0
     assert meta.from_port == "Sukošan"
     assert meta.to_port == "Ždrelac"
+    assert meta.description is None
+
+
+def test_metadata_description_imported_and_stripped(tmp_path):
+    path = _write_bundle(tmp_path, description="  Great sail, force 4 from NW.  ")
+    meta = parse_strava_metadata(path, os.path.basename(path))
+    assert meta.description == "Great sail, force 4 from NW."
+
+
+def test_metadata_blank_description_is_none(tmp_path):
+    path = _write_bundle(tmp_path, description="   ")
+    meta = parse_strava_metadata(path, os.path.basename(path))
+    assert meta.description is None
 
 
 # --- laps ---

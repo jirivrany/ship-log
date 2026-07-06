@@ -48,6 +48,14 @@
     </div>
     {% endif %}
 
+    {% if meta.description %}
+    <h6 class="text-uppercase text-muted fw-semibold border-bottom pb-2 mb-3">Leg summary</h6>
+    <div class="mb-4">
+      <label class="form-label">Imported from Strava — added as a note at arrival</label>
+      <textarea class="form-control form-control-sm" name="description" rows="3">{{ meta.description }}</textarea>
+    </div>
+    {% endif %}
+
     <h6 class="text-uppercase text-muted fw-semibold border-bottom pb-2 mb-3">Prefill log entries</h6>
     <p class="text-muted small mb-3">These values will be applied to all generated entries — you can override per row afterwards</p>
     <div class="row g-3 mb-4">

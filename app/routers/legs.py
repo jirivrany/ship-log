@@ -9,7 +9,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlmodel import Session, select
 
 from app.database import get_session
-from app.models import Leg, LogEntry, PropulsionType, Voyage
+from app.models import EntrySource, Leg, LogEntry, PropulsionType, Voyage
 from app.processors import loader
 from app.processors.merge import build_log_entries
 from app.processors.notes import create_quick_note, filter_note_entries
@@ -35,6 +35,7 @@ def _generate_gps_entries(
     default_propulsion: str,
     default_wind_direction: Optional[str],
     default_wind_force: Optional[str],
+    description: Optional[str] = None,
 ) -> list[LogEntry]:
     """Parse a track file (FIT or GPX) and build the GPS-derived LogEntry rows
     for a leg, applying prefill defaults. Does not touch any pre-existing
@@ -64,6 +65,15 @@ def _generate_gps_entries(
     if entries and prefill_propulsion == PropulsionType.motor:
         entries[0].propulsion = PropulsionType.motor
         entries[-1].propulsion = PropulsionType.motor
+
+    # Strava activity descriptions are usually a sailor-written leg summary —
+    # import it as a quick note timestamped at arrival, alongside any other
+    # generated entries.
+    if description and entries:
+        entries.append(create_quick_note(
+            leg_id, description, entries[-1].lat, entries[-1].lon,
+            timestamp=entries[-1].timestamp,
+        ))
 
     return entries
 
@@ -149,6 +159,7 @@ async def create_leg(
     timezone: str = Form("UTC"),
     track_path: str = Form(...),
     strava_activity_id: Optional[int] = Form(None),
+    description: Optional[str] = Form(None),
     # prefill defaults applied to all generated entries
     default_propulsion: str = Form("motor"),
     default_wind_direction: Optional[str] = Form(None),
@@ -192,7 +203,8 @@ async def create_leg(
     session.refresh(leg)
 
     entries = _generate_gps_entries(
-        leg.id, final_path, default_propulsion, default_wind_direction, default_wind_force
+        leg.id, final_path, default_propulsion, default_wind_direction, default_wind_force,
+        description=description,
     )
     for entry in entries:
         session.add(entry)
@@ -248,6 +260,7 @@ async def attach_track(
     leg_id: int,
     track_path: str = Form(...),
     strava_activity_id: Optional[int] = Form(None),
+    description: Optional[str] = Form(None),
     default_propulsion: str = Form("motor"),
     default_wind_direction: Optional[str] = Form(None),
     default_wind_force: Optional[str] = Form(None),
@@ -284,7 +297,8 @@ async def attach_track(
     session.commit()
 
     entries = _generate_gps_entries(
-        leg.id, final_path, default_propulsion, default_wind_direction, default_wind_force
+        leg.id, final_path, default_propulsion, default_wind_direction, default_wind_force,
+        description=description,
     )
     for entry in entries:
         session.add(entry)

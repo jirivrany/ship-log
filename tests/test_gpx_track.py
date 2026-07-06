@@ -143,6 +143,8 @@ def test_preview_accepts_gpx_and_prefills(client, voyage_id):
     assert "Sukosan" in r.text and "Zdrelac" in r.text
     assert "2026-06-20" in r.text
     assert "Europe/Zagreb" in r.text
+    # GPX carries no activity description — the note-preview section must not appear
+    assert "Leg summary" not in r.text
 
 
 def test_preview_rejects_unsupported_extension(client, voyage_id):
