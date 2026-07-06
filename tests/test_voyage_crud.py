@@ -58,7 +58,10 @@ def test_create_voyage_full_form(client, db_session):
         "name": "Chorvatsko 2025",
         "start_date": "2025-10-04",
         "end_date": "2025-10-11",
-        "boat": "Bavaria 34",
+        "boat_name": "Diana",
+        "boat_maker": "Bavaria",
+        "boat_model": "Cruiser 37",
+        "year_built": "2016",
         "skipper": "Jiri",
         "crew": "posádka",
         "length_m": "10.5",
@@ -69,11 +72,15 @@ def test_create_voyage_full_form(client, db_session):
     v = db_session.exec(select(Voyage)).one()
     assert v.name == "Chorvatsko 2025"
     assert v.start_date == "2025-10-04" and v.end_date == "2025-10-11"
+    assert v.boat_name == "Diana"
+    assert v.boat_maker == "Bavaria" and v.boat_model == "Cruiser 37"
+    assert v.year_built == 2016
     assert v.skipper == "Jiri"
     assert v.length_m == 10.5 and v.max_persons == 8
+    assert v.boat_label == "Diana — Bavaria Cruiser 37 (2016)"
 
 
-def test_create_voyage_requires_name_and_boat(client, db_session):
+def test_create_voyage_requires_name_and_boat_name(client, db_session):
     r = client.post("/voyages", data={"name": "No boat"})
     assert r.status_code == 400
     assert db_session.exec(select(Voyage)).all() == []
@@ -83,7 +90,7 @@ def test_create_voyage_requires_name_and_boat(client, db_session):
 
 @pytest.fixture()
 def voyage(db_session):
-    v = Voyage(name="Original", boat="Bavaria 34", skipper="Jiri", length_m=10.5)
+    v = Voyage(name="Original", boat_name="Bavaria 34", skipper="Jiri", length_m=10.5)
     db_session.add(v)
     db_session.commit()
     db_session.refresh(v)
@@ -101,7 +108,7 @@ def test_edit_form_prefilled(client, voyage):
 def test_edit_saves_and_preserves_untouched(client, voyage, db_session):
     r = client.post(f"/voyages/{voyage.id}/edit", data={
         "name": "Original",
-        "boat": "Bavaria 34",
+        "boat_name": "Bavaria 34",
         "start_date": "2025-10-04",
         "end_date": "2025-10-11",
         "skipper": "Jiri",
@@ -119,7 +126,7 @@ def test_edit_dates_drive_strava_window(client, voyage, db_session):
     from app.routers.strava import _voyage_window
 
     client.post(f"/voyages/{voyage.id}/edit", data={
-        "name": "Original", "boat": "Bavaria 34",
+        "name": "Original", "boat_name": "Bavaria 34",
         "start_date": "2025-10-04", "end_date": "2025-10-11",
     })
     db_session.refresh(voyage)
@@ -129,7 +136,7 @@ def test_edit_dates_drive_strava_window(client, voyage, db_session):
 
 def test_edit_blank_field_clears_value(client, voyage, db_session):
     client.post(f"/voyages/{voyage.id}/edit", data={
-        "name": "Original", "boat": "Bavaria 34", "skipper": "",
+        "name": "Original", "boat_name": "Bavaria 34", "skipper": "",
     })
     db_session.refresh(voyage)
     assert voyage.skipper is None
@@ -137,7 +144,7 @@ def test_edit_blank_field_clears_value(client, voyage, db_session):
 
 def test_edit_missing_voyage_404(client):
     assert client.get("/voyages/999/edit").status_code == 404
-    r = client.post("/voyages/999/edit", data={"name": "x", "boat": "y"})
+    r = client.post("/voyages/999/edit", data={"name": "x", "boat_name": "y"})
     assert r.status_code == 404
 
 

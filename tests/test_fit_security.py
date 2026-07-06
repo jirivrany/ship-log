@@ -43,7 +43,7 @@ def client(db_session):
 
 @pytest.fixture()
 def voyage_id(db_session):
-    v = Voyage(name="Test voyage", boat="Test boat")
+    v = Voyage(name="Test voyage", boat_name="Test boat")
     db_session.add(v)
     db_session.commit()
     db_session.refresh(v)

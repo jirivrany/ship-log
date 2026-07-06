@@ -138,7 +138,7 @@ def test_voyage_window_with_margins():
     from app.models import Voyage
     from app.routers.strava import _voyage_window
 
-    voyage = Voyage(name="v", boat="b", start_date="2025-10-04", end_date="2025-10-11")
+    voyage = Voyage(name="v", boat_name="b", start_date="2025-10-04", end_date="2025-10-11")
     after, before = _voyage_window(voyage)
     assert after == int(datetime(2025, 10, 3, tzinfo=tz.utc).timestamp())
     assert before == int(datetime(2025, 10, 13, tzinfo=tz.utc).timestamp())
@@ -148,8 +148,8 @@ def test_voyage_window_without_dates_is_open():
     from app.models import Voyage
     from app.routers.strava import _voyage_window
 
-    assert _voyage_window(Voyage(name="v", boat="b")) == (None, None)
-    after, before = _voyage_window(Voyage(name="v", boat="b", start_date="2025-10-04"))
+    assert _voyage_window(Voyage(name="v", boat_name="b")) == (None, None)
+    after, before = _voyage_window(Voyage(name="v", boat_name="b", start_date="2025-10-04"))
     assert after is not None and before is None
 
 

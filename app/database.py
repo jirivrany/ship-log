@@ -38,6 +38,18 @@ def migrate_schema(target_engine) -> None:
                 if col not in voyage_cols:
                     conn.exec_driver_sql(f"ALTER TABLE voyage ADD COLUMN {col} VARCHAR")
 
+            # 2026-07: boat -> boat_name + boat_maker + boat_model + year_built.
+            # The old combined value stays in boat_name; the user splits it by hand.
+            if "boat" in voyage_cols and "boat_name" not in voyage_cols:
+                conn.exec_driver_sql("ALTER TABLE voyage RENAME COLUMN boat TO boat_name")
+                voyage_cols.discard("boat")
+                voyage_cols.add("boat_name")
+            for col in ("boat_maker", "boat_model"):
+                if col not in voyage_cols:
+                    conn.exec_driver_sql(f"ALTER TABLE voyage ADD COLUMN {col} VARCHAR")
+            if "year_built" not in voyage_cols:
+                conn.exec_driver_sql("ALTER TABLE voyage ADD COLUMN year_built INTEGER")
+
         conn.commit()
 
 

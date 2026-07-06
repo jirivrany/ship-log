@@ -68,11 +68,16 @@ def test_migrates_old_schema(tmp_path):
     with engine.connect() as conn:
         voyage_cols = {r[1] for r in conn.exec_driver_sql("PRAGMA table_info(voyage)").fetchall()}
         row = conn.exec_driver_sql(
-            "SELECT name, crew, start_date, end_date, skipper FROM voyage"
+            "SELECT name, crew, start_date, end_date, skipper, "
+            "boat_name, boat_maker, boat_model, year_built FROM voyage"
         ).fetchone()
-    assert {"start_date", "end_date", "skipper"} <= voyage_cols
-    # existing data untouched, new columns empty
-    assert row == ("Chorvatsko 2026", "posádka", None, None, None)
+    assert "boat" not in voyage_cols
+    assert {"start_date", "end_date", "skipper",
+            "boat_name", "boat_maker", "boat_model", "year_built"} <= voyage_cols
+    # existing data untouched: old combined boat value lands in boat_name,
+    # the other new columns stay empty
+    assert row == ("Chorvatsko 2026", "posádka", None, None, None,
+                   "Bavaria", None, None, None)
 
 
 def test_migration_is_idempotent(tmp_path):

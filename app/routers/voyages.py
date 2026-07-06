@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlmodel import Session, select
 
+from app import boat_library
 from app.database import get_session
 from app.models import Leg, LogEntry, Voyage
 from app.processors import loader
@@ -16,28 +17,30 @@ router = APIRouter()
 
 UPLOAD_DIR = os.environ.get("UPLOAD_DIR", "/app/data/uploads")
 
-# Optional voyage form fields and how to parse them; name/boat are required
-# and handled separately. Shared by create and edit so they cannot drift.
+# Optional voyage form fields and how to parse them; name/boat_name are
+# required and handled separately. Shared by create and edit so they cannot
+# drift.
 _VOYAGE_STR_FIELDS = (
-    "start_date", "end_date", "registration_number", "home_port",
+    "start_date", "end_date", "boat_maker", "boat_model",
+    "registration_number", "home_port",
     "call_sign", "owner", "skipper", "crew", "engine_type",
 )
 _VOYAGE_FLOAT_FIELDS = (
     "length_m", "beam_m", "draft_m", "air_draft_m", "engine_power_kw",
     "displacement_t", "sail_area_m2", "mainsail_m2", "genoa_m2",
 )
-_VOYAGE_INT_FIELDS = ("max_persons", "water_tank_l", "fuel_tank_l")
+_VOYAGE_INT_FIELDS = ("year_built", "max_persons", "water_tank_l", "fuel_tank_l")
 
 
 def _apply_voyage_form(voyage: Voyage, form) -> Optional[str]:
     """Copy submitted form values onto the voyage; returns an error message
     if a required field is missing, else None."""
     name = (form.get("name") or "").strip()
-    boat = (form.get("boat") or "").strip()
-    if not name or not boat:
-        return "Voyage name and boat are required"
+    boat_name = (form.get("boat_name") or "").strip()
+    if not name or not boat_name:
+        return "Voyage name and boat name are required"
     voyage.name = name
-    voyage.boat = boat
+    voyage.boat_name = boat_name
 
     for field in _VOYAGE_STR_FIELDS:
         setattr(voyage, field, (form.get(field) or "").strip() or None)
@@ -50,6 +53,15 @@ def _apply_voyage_form(voyage: Voyage, form) -> Optional[str]:
     return None
 
 
+@router.get("/api/boat-library")
+def boat_library_lookup(name: str = "", maker: str = "", model: str = ""):
+    """Prefill data for the voyage form: match by boat name, else maker+model."""
+    match = boat_library.lookup(name=name, maker=maker, model=model)
+    if not match:
+        return {"found": False}
+    return {"found": True, **match}
+
+
 @router.get("/", response_class=HTMLResponse)
 def index(request: Request, session: Session = Depends(get_session)):
     voyages = session.exec(select(Voyage).order_by(Voyage.created_at.desc())).all()
@@ -58,7 +70,7 @@ def index(request: Request, session: Session = Depends(get_session)):
 
 @router.post("/voyages")
 async def create_voyage(request: Request, session: Session = Depends(get_session)):
-    voyage = Voyage(name="", boat="")
+    voyage = Voyage(name="", boat_name="")
     error = _apply_voyage_form(voyage, await request.form())
     if error:
         return HTMLResponse(error, status_code=400)

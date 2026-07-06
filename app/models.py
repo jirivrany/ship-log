@@ -32,7 +32,10 @@ class Voyage(SQLModel, table=True):
     end_date: Optional[str] = None          # ISO date YYYY-MM-DD (charter end)
 
     # Boat identification (PDF: front page header)
-    boat: str                               # Jméno/typ jachty
+    boat_name: str                              # Jméno jachty, e.g. "Diana"
+    boat_maker: Optional[str] = None            # Výrobce, e.g. "Bavaria"
+    boat_model: Optional[str] = None            # Typ, e.g. "Cruiser 37"
+    year_built: Optional[int] = None            # Rok výroby
     registration_number: Optional[str] = None   # Registrační číslo
     home_port: Optional[str] = None             # Domovský přístav
     call_sign: Optional[str] = None             # Volací značka
@@ -58,6 +61,17 @@ class Voyage(SQLModel, table=True):
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
     legs: list["Leg"] = Relationship(back_populates="voyage")
+
+    @property
+    def boat_label(self) -> str:
+        """Display string, e.g. 'Diana — Bavaria Cruiser 37 (2016)'."""
+        maker_model = " ".join(p for p in (self.boat_maker, self.boat_model) if p)
+        label = self.boat_name
+        if maker_model:
+            label = f"{label} — {maker_model}" if label else maker_model
+        if self.year_built:
+            label += f" ({self.year_built})"
+        return label
 
 
 class Leg(SQLModel, table=True):

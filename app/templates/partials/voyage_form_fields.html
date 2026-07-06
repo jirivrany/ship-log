@@ -17,11 +17,29 @@
   </div>
 </div>
 
-<h6 class="text-uppercase text-muted fw-semibold mb-3 border-bottom pb-2">Boat identification</h6>
+<div class="d-flex justify-content-between align-items-end border-bottom pb-2 mb-3">
+  <h6 class="text-uppercase text-muted fw-semibold mb-0">Boat identification</h6>
+  <div class="d-flex align-items-center gap-2">
+    <span class="boat-library-status small text-muted"></span>
+    <button type="button" class="btn btn-outline-primary btn-sm" onclick="fillFromBoatLibrary(this)">⚓ Fill from library</button>
+  </div>
+</div>
 <div class="row g-3 mb-3">
   <div class="col-md-4">
-    <label class="form-label">Boat name / type <span class="text-danger">*</span></label>
-    <input type="text" class="form-control" name="boat" placeholder="Bavaria Cruiser 34" value="{{ v.boat or '' }}" required>
+    <label class="form-label">Boat name <span class="text-danger">*</span></label>
+    <input type="text" class="form-control" name="boat_name" placeholder="Diana" value="{{ v.boat_name or '' }}" required>
+  </div>
+  <div class="col-md-3">
+    <label class="form-label">Maker</label>
+    <input type="text" class="form-control" name="boat_maker" placeholder="Bavaria" value="{{ v.boat_maker or '' }}">
+  </div>
+  <div class="col-md-3">
+    <label class="form-label">Model</label>
+    <input type="text" class="form-control" name="boat_model" placeholder="Cruiser 37" value="{{ v.boat_model or '' }}">
+  </div>
+  <div class="col-md-2">
+    <label class="form-label">Year built</label>
+    <input type="number" class="form-control" name="year_built" min="1900" max="2100" placeholder="2016" value="{{ v.year_built or '' }}">
   </div>
   <div class="col-md-4">
     <label class="form-label">Registration number</label>
@@ -104,3 +122,30 @@
     <input type="number" class="form-control" name="fuel_tank_l" value="{{ v.fuel_tank_l or '' }}">
   </div>
 </div>
+
+<script>
+async function fillFromBoatLibrary(btn) {
+  const form = btn.closest('form');
+  const status = form.querySelector('.boat-library-status');
+  const params = new URLSearchParams({
+    name: form.elements['boat_name'].value,
+    maker: form.elements['boat_maker'].value,
+    model: form.elements['boat_model'].value,
+  });
+  const data = await (await fetch('/api/boat-library?' + params)).json();
+  if (!data.found) {
+    status.textContent = 'No match in boat library';
+    return;
+  }
+  let filled = 0;
+  for (const [field, value] of Object.entries(data.fields)) {
+    const input = form.elements[field];
+    if (input && !input.value) {
+      input.value = value;
+      filled++;
+    }
+  }
+  status.textContent = `${data.label} — filled ${filled} empty field${filled === 1 ? '' : 's'}`
+    + (data.note ? ` · ${data.note}` : '');
+}
+</script>
