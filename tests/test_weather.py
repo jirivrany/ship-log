@@ -1,5 +1,10 @@
 """Weather derivations and Open-Meteo client (PRD: weather enrichment)."""
-from app.weather import degrees_to_sector, knots_to_beaufort
+from app.weather import (
+    cloud_pct_to_oktas,
+    degrees_to_sector,
+    knots_to_beaufort,
+    wave_height_to_douglas,
+)
 
 
 def test_moderate_breeze_is_4_bft():
@@ -37,3 +42,28 @@ def test_sector_boundaries_and_wrap():
     assert degrees_to_sector(348.75) == "N"
     assert degrees_to_sector(348.74) == "NNW"
     assert degrees_to_sector(360) == "N"
+
+
+def test_cloud_pct_to_oktas():
+    assert cloud_pct_to_oktas(0) == 0
+    assert cloud_pct_to_oktas(100) == 8
+    assert cloud_pct_to_oktas(50) == 4
+    assert cloud_pct_to_oktas(15) == 1
+    assert cloud_pct_to_oktas(19) == 2   # 1.52 rounds up
+
+
+def test_wave_height_to_douglas():
+    # Douglas scale by significant wave height (m), lower bound inclusive:
+    # 0: 0, 1: (0-0.1], 2: (0.1-0.5], 3: (0.5-1.25], 4: (1.25-2.5],
+    # 5: (2.5-4], 6: (4-6], 7: (6-9], 8: (9-14], 9: >14
+    assert wave_height_to_douglas(0.0) == 0
+    assert wave_height_to_douglas(0.05) == 1
+    assert wave_height_to_douglas(0.3) == 2
+    assert wave_height_to_douglas(0.5) == 2
+    assert wave_height_to_douglas(1.0) == 3
+    assert wave_height_to_douglas(2.5) == 4
+    assert wave_height_to_douglas(3.0) == 5
+    assert wave_height_to_douglas(5.0) == 6
+    assert wave_height_to_douglas(8.0) == 7
+    assert wave_height_to_douglas(10.0) == 8
+    assert wave_height_to_douglas(15.0) == 9
