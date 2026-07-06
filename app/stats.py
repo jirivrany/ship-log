@@ -73,6 +73,46 @@ def compute_stats(entries: list, *, wall_clock_duration: bool = True) -> dict:
     }
 
 
+def _format_range(low, high, unit: str) -> str:
+    span = f"{low}" if low == high else f"{low}–{high}"
+    return f"{span} {unit}"
+
+
+def weather_summary(entries: list) -> Optional[str]:
+    """One-line weather overview of a leg, derived at render time (not stored).
+
+    E.g. "23.7–24.8 °C · wind W 3–4 Bf · 1016.6 → 1015.6 hPa stable · 0–1/8 cloud".
+    Only the parts some entry actually carries appear; None when there are none.
+    """
+    temps = [e.air_temperature for e in entries if e.air_temperature is not None]
+    forces = [e.wind_force for e in entries if e.wind_force is not None]
+    sectors = [e.wind_direction for e in entries if e.wind_direction]
+    oktas = [e.cloud_cover for e in entries if e.cloud_cover is not None]
+    pressures = [e.atmospheric_pressure for e in entries
+                 if e.atmospheric_pressure is not None]
+
+    parts = []
+    if temps:
+        parts.append(_format_range(min(temps), max(temps), "°C"))
+    if sectors or forces:
+        dominant = max(set(sectors), key=sectors.count) if sectors else ""
+        grades = _format_range(min(forces), max(forces), "Bf") if forces else ""
+        parts.append(" ".join(p for p in ("wind", dominant, grades) if p))
+    if pressures:
+        span = (f"{pressures[0]}" if pressures[-1] == pressures[0]
+                else f"{pressures[0]} → {pressures[-1]}")
+        trend = ""
+        if len(pressures) >= 2:
+            delta = pressures[-1] - pressures[0]
+            trend = " rising" if delta >= 1 else " falling" if delta <= -1 else " stable"
+        parts.append(f"{span} hPa{trend}")
+    if oktas:
+        low, high = min(oktas), max(oktas)
+        parts.append(f"{low if low == high else f'{low}–{high}'}/8 cloud")
+
+    return " · ".join(parts) if parts else None
+
+
 def aggregate_stats(stats_list: list[dict]) -> dict:
     """Sum per-voyage compute_stats() results into one formatted summary.
 

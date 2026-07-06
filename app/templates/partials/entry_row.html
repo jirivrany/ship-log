@@ -4,7 +4,7 @@
   <td>{{ entry.course | int if entry.course else '—' }}</td>
   <td>{{ "%.1f"|format(entry.speed) if entry.speed else '—' }}</td>
   <td>{{ "%.1f"|format(entry.log_value) if entry.log_value else '—' }}</td>
-  <td><span class="badge badge--{{ entry.source.value }}">{{ entry.source.value.replace('_', ' ') }}</span></td>
+  <td><span class="badge badge--{{ entry.source.value }}">{{ entry.source.value.replace('_', ' ') }}</span>{% if entry.weather_source %} <span title="weather auto-filled from {{ entry.weather_source }}">⛅</span>{% endif %}</td>
 
   <td>
     <select class="input-sm"

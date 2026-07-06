@@ -56,6 +56,14 @@ def migrate_schema(target_engine) -> None:
                     "ALTER TABLE voyage ADD COLUMN was_skipper BOOLEAN NOT NULL DEFAULT 0"
                 )
 
+        # 2026-07: weather enrichment — exact wind speed + provenance marker
+        entry_cols = {row[1] for row in conn.exec_driver_sql("PRAGMA table_info(logentry)").fetchall()}
+        if entry_cols:
+            if "wind_speed_kn" not in entry_cols:
+                conn.exec_driver_sql("ALTER TABLE logentry ADD COLUMN wind_speed_kn FLOAT")
+            if "weather_source" not in entry_cols:
+                conn.exec_driver_sql("ALTER TABLE logentry ADD COLUMN weather_source VARCHAR")
+
         conn.commit()
 
 

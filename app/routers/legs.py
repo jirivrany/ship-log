@@ -1,6 +1,7 @@
 import os
 import pathlib
 import shutil
+import urllib.parse
 from typing import Optional
 from zoneinfo import ZoneInfo
 
@@ -13,8 +14,10 @@ from app.models import EntrySource, Leg, LogEntry, PropulsionType, Voyage
 from app.processors import loader
 from app.processors.merge import build_log_entries
 from app.processors.notes import create_quick_note, filter_note_entries
-from app.stats import compute_stats
+from app.stats import compute_stats, weather_summary
 from app.templates_env import templates
+from app.weather import fetch_weather
+from app.weather_apply import apply_weather
 
 router = APIRouter()
 
@@ -346,7 +349,43 @@ def leg_detail(leg_id: int, request: Request, session: Session = Depends(get_ses
         "track_points": track_points,
         "tz_name": leg.timezone,
         "stats": stats,
+        "weather": weather_summary(entries),
+        "weather_msg": request.query_params.get("weather_msg"),
     })
+
+
+@router.post("/legs/{leg_id}/fetch-weather")
+def fetch_leg_weather(
+    leg_id: int,
+    overwrite: bool = Form(False),
+    session: Session = Depends(get_session),
+):
+    """Prefill the leg's entries with historical Open-Meteo weather."""
+    leg = session.get(Leg, leg_id)
+    if not leg:
+        return HTMLResponse("Not found", status_code=404)
+
+    entries = session.exec(
+        select(LogEntry).where(LogEntry.leg_id == leg_id).order_by(LogEntry.timestamp)
+    ).all()
+    positioned = [e for e in entries if e.lat is not None and e.lon is not None]
+
+    if not positioned:
+        msg = "No entries with a position to enrich"
+    else:
+        observations = fetch_weather([(e.timestamp, e.lat, e.lon) for e in positioned])
+        filled = apply_weather(positioned, observations, overwrite=overwrite)
+        for entry in positioned:
+            session.add(entry)
+        session.commit()
+        if filled:
+            msg = f"Weather filled for {filled} of {len(positioned)} entries"
+        else:
+            msg = "No weather data available right now — try again later"
+
+    return RedirectResponse(
+        f"/legs/{leg_id}?weather_msg={urllib.parse.quote(msg)}", status_code=303
+    )
 
 
 def _compute_leg_stats(entries: list) -> dict:
@@ -490,7 +529,9 @@ def leg_summary(leg_id: int, request: Request, session: Session = Depends(get_se
         select(LogEntry).where(LogEntry.leg_id == leg_id).order_by(LogEntry.timestamp)
     ).all()
     stats = _compute_leg_stats(entries)
-    return templates.TemplateResponse("partials/leg_summary.html", {"request": request, "stats": stats})
+    return templates.TemplateResponse("partials/leg_summary.html", {
+        "request": request, "stats": stats, "weather": weather_summary(entries),
+    })
 
 
 @router.delete("/legs/{leg_id}", response_class=HTMLResponse)
