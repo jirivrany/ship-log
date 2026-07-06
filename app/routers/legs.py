@@ -380,6 +380,8 @@ def fetch_leg_weather(
         session.commit()
         if filled:
             msg = f"Weather filled for {filled} of {len(positioned)} entries"
+        elif any(o is not None for o in observations):
+            msg = "Nothing to fill — all weather fields already have values (tick overwrite to refresh)"
         else:
             msg = "No weather data available right now — try again later"
 
