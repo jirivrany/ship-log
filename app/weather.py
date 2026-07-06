@@ -1,6 +1,14 @@
 """Historical weather for log entries: unit derivations + Open-Meteo client."""
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 from typing import Optional
+
+import httpx
+
+ARCHIVE_URL = "https://archive-api.open-meteo.com/v1/archive"
+HOURLY_VARS = "wind_speed_10m,wind_direction_10m,temperature_2m,pressure_msl,cloud_cover"
+GRID_DEG = 0.25   # ERA5 cell size: points are deduplicated onto this grid
+TIMEOUT_S = 10.0
 
 
 @dataclass
@@ -49,3 +57,85 @@ def wave_height_to_douglas(height_m: float) -> int:
         if height_m <= upper:
             return state
     return 9
+
+
+def _grid_cell(lat: float, lon: float) -> tuple[float, float]:
+    return (round(lat / GRID_DEG) * GRID_DEG, round(lon / GRID_DEG) * GRID_DEG)
+
+
+def _nearest_hour_key(ts: datetime) -> str:
+    rounded = (ts + timedelta(minutes=30)).replace(minute=0, second=0, microsecond=0)
+    return rounded.strftime("%Y-%m-%dT%H:00")
+
+
+def _hourly_value(location: dict, variable: str, hour_key: str) -> Optional[float]:
+    hourly = location.get("hourly", {})
+    try:
+        idx = hourly["time"].index(hour_key)
+    except (KeyError, ValueError):
+        return None
+    values = hourly.get(variable)
+    return values[idx] if values else None
+
+
+def fetch_weather(
+    points: list[tuple[datetime, float, float]],
+    client: Optional[httpx.Client] = None,
+) -> list[Optional[WeatherObservation]]:
+    """Historical weather for (naive-UTC timestamp, lat, lon) points.
+
+    One batched Open-Meteo archive request for all points; each point is
+    matched to its own grid cell and nearest hour.
+    """
+    if not points:
+        return []
+
+    cells: list[tuple[float, float]] = []
+    cell_index: dict[tuple[float, float], int] = {}
+    for _, lat, lon in points:
+        cell = _grid_cell(lat, lon)
+        if cell not in cell_index:
+            cell_index[cell] = len(cells)
+            cells.append(cell)
+
+    dates = sorted(ts.date() for ts, _, _ in points)
+    params = {
+        "latitude": ",".join(str(lat) for lat, _ in cells),
+        "longitude": ",".join(str(lon) for _, lon in cells),
+        "start_date": dates[0].isoformat(),
+        "end_date": dates[-1].isoformat(),
+        "hourly": HOURLY_VARS,
+        "wind_speed_unit": "kn",
+        "cell_selection": "sea",
+        "timezone": "UTC",
+    }
+
+    own_client = client is None
+    if own_client:
+        client = httpx.Client(timeout=TIMEOUT_S)
+    try:
+        response = client.get(ARCHIVE_URL, params=params)
+        response.raise_for_status()
+        data = response.json()
+    finally:
+        if own_client:
+            client.close()
+
+    locations = data if isinstance(data, list) else [data]
+
+    observations: list[Optional[WeatherObservation]] = []
+    for ts, lat, lon in points:
+        location = locations[cell_index[_grid_cell(lat, lon)]]
+        hour = _nearest_hour_key(ts)
+        wind_kn = _hourly_value(location, "wind_speed_10m", hour)
+        wind_deg = _hourly_value(location, "wind_direction_10m", hour)
+        cloud_pct = _hourly_value(location, "cloud_cover", hour)
+        observations.append(WeatherObservation(
+            wind_speed_kn=wind_kn,
+            wind_direction=degrees_to_sector(wind_deg) if wind_deg is not None else None,
+            wind_force=knots_to_beaufort(wind_kn) if wind_kn is not None else None,
+            air_temperature=_hourly_value(location, "temperature_2m", hour),
+            atmospheric_pressure=_hourly_value(location, "pressure_msl", hour),
+            cloud_cover=cloud_pct_to_oktas(cloud_pct) if cloud_pct is not None else None,
+        ))
+    return observations

@@ -1,10 +1,86 @@
-"""Weather derivations and Open-Meteo client (PRD: weather enrichment)."""
+"""Weather derivations and Open-Meteo client (PRD: weather enrichment).
+
+HTTP is served by httpx.MockTransport from fixtures recorded off the real
+Open-Meteo APIs (scripts/record_openmeteo_fixtures.py); no live calls.
+"""
+import json
+import os
+from datetime import datetime
+
+import httpx
+
 from app.weather import (
     cloud_pct_to_oktas,
     degrees_to_sector,
+    fetch_weather,
     knots_to_beaufort,
     wave_height_to_douglas,
 )
+
+FIXTURES = os.path.join(os.path.dirname(__file__), "fixtures")
+
+
+def _fixture(name: str):
+    with open(os.path.join(FIXTURES, name), encoding="utf-8") as f:
+        return json.load(f)
+
+
+def _client_serving(routes: dict, requests: list) -> httpx.Client:
+    """Mock client mapping host substrings to fixture payloads."""
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        for host_part, payload in routes.items():
+            if host_part in request.url.host:
+                return httpx.Response(200, json=payload)
+        return httpx.Response(404)
+    return httpx.Client(transport=httpx.MockTransport(handler))
+
+
+# The recorded archive fixture: Kornati day sail 2025-06-15, two locations.
+KORNATI_POINTS = [
+    (datetime(2025, 6, 15, 13, 20), 43.78, 15.30),  # loc 0, 13:00
+    (datetime(2025, 6, 15, 14, 20), 43.79, 15.31),  # same grid cell, 14:00
+    (datetime(2025, 6, 15, 14, 50), 43.90, 15.45),  # loc 1, 15:00
+]
+
+
+def test_fetch_batches_points_into_one_archive_request():
+    requests = []
+    client = _client_serving({"archive-api": _fixture("openmeteo_archive.json")}, requests)
+
+    observations = fetch_weather(KORNATI_POINTS, client=client)
+
+    archive_requests = [r for r in requests if "archive-api" in r.url.host]
+    assert len(archive_requests) == 1
+    params = archive_requests[0].url.params
+    # nearby points collapse onto the same grid cell -> two locations, not three
+    assert len(params["latitude"].split(",")) == 2
+    assert params["cell_selection"] == "sea"
+    assert params["wind_speed_unit"] == "kn"
+    assert params["start_date"] == "2025-06-15"
+    assert len(observations) == 3
+
+
+def test_fetch_matches_each_point_to_own_location_and_hour():
+    client = _client_serving({"archive-api": _fixture("openmeteo_archive.json")}, [])
+
+    obs = fetch_weather(KORNATI_POINTS, client=client)
+
+    # loc 0 @ 13:00: wind 10.0 kn / 263 deg, 23.8 C, 1016.6 hPa, 0 % cloud
+    assert obs[0].wind_speed_kn == 10.0
+    assert obs[0].wind_direction == "W"
+    assert obs[0].wind_force == 3
+    assert obs[0].air_temperature == 23.8
+    assert obs[0].atmospheric_pressure == 1016.6
+    assert obs[0].cloud_cover == 0
+    # loc 0 @ 14:00 (13:50 rounds up): wind 10.9 kn / 259 deg
+    assert obs[1].wind_speed_kn == 10.9
+    assert obs[1].air_temperature == 23.7
+    # loc 1 @ 15:00: wind 10.8 kn / 274 deg, 24.4 C, 7 % cloud -> 1 okta
+    assert obs[2].wind_speed_kn == 10.8
+    assert obs[2].wind_direction == "W"
+    assert obs[2].air_temperature == 24.4
+    assert obs[2].cloud_cover == 1
 
 
 def test_moderate_breeze_is_4_bft():
