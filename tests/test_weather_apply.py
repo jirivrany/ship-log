@@ -49,3 +49,51 @@ def test_fills_empty_fields_and_marks_source():
     assert entry.cloud_cover == 1
     assert entry.sea_state == 3
     assert entry.weather_source == "open-meteo"
+
+
+def test_default_never_touches_existing_values():
+    # Garmin-measured temp + import-prefilled wind must survive a default fetch,
+    # while the still-empty fields around them get filled.
+    entry = _entry(air_temperature=22.0, wind_force=3, wind_direction="NW")
+    filled = apply_weather([entry], [_observation()], overwrite=False)
+
+    assert entry.air_temperature == 22.0
+    assert entry.wind_force == 3
+    assert entry.wind_direction == "NW"
+    assert entry.atmospheric_pressure == 1014.5
+    assert entry.cloud_cover == 1
+    assert filled == 1
+    assert entry.weather_source == "open-meteo"
+
+
+def test_overwrite_replaces_existing_values():
+    entry = _entry(air_temperature=22.0, wind_force=3, wind_direction="NW")
+    filled = apply_weather([entry], [_observation()], overwrite=True)
+
+    assert filled == 1
+    assert entry.air_temperature == 24.5
+    assert entry.wind_force == 4
+    assert entry.wind_direction == "NE"
+    assert entry.weather_source == "open-meteo"
+
+
+def test_missing_observation_leaves_entry_untouched():
+    covered = _entry()
+    gap = _entry(wind_force=2)
+
+    filled = apply_weather([covered, gap], [_observation(), None], overwrite=True)
+
+    assert filled == 1
+    assert gap.wind_force == 2
+    assert gap.atmospheric_pressure is None
+    assert gap.weather_source is None
+
+
+def test_all_null_observation_is_not_counted():
+    # Archive can return a row of nulls (e.g. date not yet in ERA5): the entry
+    # must not be marked as enriched.
+    entry = _entry()
+    filled = apply_weather([entry], [WeatherObservation()], overwrite=False)
+
+    assert filled == 0
+    assert entry.weather_source is None
