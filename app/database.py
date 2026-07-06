@@ -50,6 +50,12 @@ def migrate_schema(target_engine) -> None:
             if "year_built" not in voyage_cols:
                 conn.exec_driver_sql("ALTER TABLE voyage ADD COLUMN year_built INTEGER")
 
+            # 2026-07: user profile — per-voyage "I was the skipper" flag
+            if "was_skipper" not in voyage_cols:
+                conn.exec_driver_sql(
+                    "ALTER TABLE voyage ADD COLUMN was_skipper BOOLEAN NOT NULL DEFAULT 0"
+                )
+
         conn.commit()
 
 

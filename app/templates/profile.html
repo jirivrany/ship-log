@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Profile — Ship Log{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1 class="h3 mb-0">{{ profile.name if profile and profile.name else "Profile" }}</h1>
+  <form method="post" action="/profile" class="input-group input-group-sm" style="max-width: 20rem;">
+    <input type="text" class="form-control" name="name" placeholder="Your name"
+           value="{{ profile.name if profile and profile.name else '' }}">
+    <button type="submit" class="btn btn-outline-primary">Save</button>
+  </form>
+</div>
+
+<h6 class="text-uppercase text-muted fw-semibold mb-2 border-bottom pb-2">All voyages</h6>
+<div class="mb-4">
+  {% set stats = overall %}
+  {% include "partials/stats_tiles.html" %}
+</div>
+
+{% if skippered.voyage_count > 0 %}
+<h6 class="text-uppercase text-muted fw-semibold mb-2 border-bottom pb-2">As skipper</h6>
+<div class="mb-4">
+  {% set stats = skippered %}
+  {% include "partials/stats_tiles.html" %}
+</div>
+{% endif %}
+
+{% if as_crew.voyage_count > 0 %}
+<h6 class="text-uppercase text-muted fw-semibold mb-2 border-bottom pb-2">As crew member</h6>
+<div class="mb-4">
+  {% set stats = as_crew %}
+  {% include "partials/stats_tiles.html" %}
+</div>
+{% endif %}
+{% endblock %}

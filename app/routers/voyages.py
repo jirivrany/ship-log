@@ -50,6 +50,8 @@ def _apply_voyage_form(voyage: Voyage, form) -> Optional[str]:
     for field in _VOYAGE_INT_FIELDS:
         value = (form.get(field) or "").strip()
         setattr(voyage, field, int(value) if value else None)
+    # checkboxes are absent from the POST body when unchecked
+    voyage.was_skipper = form.get("was_skipper") is not None
     return None
 
 
@@ -106,21 +108,10 @@ def voyage_detail(voyage_id: int, request: Request, session: Session = Depends(g
     voyage = session.get(Voyage, voyage_id)
     if not voyage:
         return HTMLResponse("Not found", status_code=404)
-    leg_entries = {}
-    for leg in voyage.legs:
-        leg_entries[leg.id] = session.exec(
-            select(LogEntry).where(LogEntry.leg_id == leg.id).order_by(LogEntry.timestamp)
-        ).all()
+    legs, leg_entries = gather_voyage_entries(session, voyage)
 
-    def _leg_sort_key(leg):
-        entries = leg_entries[leg.id]
-        start_ts = entries[0].timestamp if entries else None
-        return (leg.date, start_ts)
-
-    legs = sorted(voyage.legs, key=_leg_sort_key)
-
-    leg_stats = {leg.id: _compute_stats(leg_entries[leg.id]) for leg in legs}
-    voyage_stats = _compute_stats([e for leg in legs for e in leg_entries[leg.id]])
+    leg_stats = {leg.id: compute_stats(leg_entries[leg.id]) for leg in legs}
+    voyage_stats = compute_stats([e for leg in legs for e in leg_entries[leg.id]])
 
     leg_tracks = {leg.id: _load_leg_track(leg) for leg in legs}
 
@@ -134,6 +125,24 @@ def voyage_detail(voyage_id: int, request: Request, session: Session = Depends(g
     })
 
 
+def gather_voyage_entries(session: Session, voyage: Voyage) -> tuple[list[Leg], dict[int, list[LogEntry]]]:
+    """Legs sorted by (date, first entry timestamp) plus entries per leg
+    ordered by timestamp — the canonical order for voyage-level stats."""
+    leg_entries = {}
+    for leg in voyage.legs:
+        leg_entries[leg.id] = session.exec(
+            select(LogEntry).where(LogEntry.leg_id == leg.id).order_by(LogEntry.timestamp)
+        ).all()
+
+    def _leg_sort_key(leg):
+        entries = leg_entries[leg.id]
+        start_ts = entries[0].timestamp if entries else None
+        return (leg.date, start_ts)
+
+    legs = sorted(voyage.legs, key=_leg_sort_key)
+    return legs, leg_entries
+
+
 def _load_leg_track(leg: Leg) -> list[dict]:
     """Return [[lat, lon], ...] for the full leg track, or [] if no track file."""
     if not leg.track_path:
@@ -143,10 +152,6 @@ def _load_leg_track(leg: Leg) -> list[dict]:
     except Exception:
         return []
     return [[pt.lat, pt.lon] for pt in track.track_points]
-
-
-def _compute_stats(entries: list) -> dict:
-    return compute_stats(entries)
 
 
 @router.delete("/voyages/{voyage_id}", response_class=HTMLResponse)

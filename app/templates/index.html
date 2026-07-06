@@ -27,8 +27,14 @@
   <a href="/voyages/{{ voyage.id }}" class="card card-body text-decoration-none text-dark voyage-card">
     <div class="fw-semibold">{{ voyage.name }}</div>
     <div class="text-muted small">
+      {% if voyage.start_date and voyage.end_date %}
+        {{ voyage.start_date | datetimeformat("%-d.%-m.") }}–{{ voyage.end_date | datetimeformat("%-d.%-m.%Y") }} ·
+      {% elif voyage.start_date %}
+        {{ voyage.start_date | datetimeformat("%-d.%-m.%Y") }} ·
+      {% endif %}
       {{ voyage.boat_label }}
       {% if voyage.registration_number %} · {{ voyage.registration_number }}{% endif %}
+      {% if voyage.skipper %} · Skipper: {{ voyage.skipper }}{% endif %}
       {% if voyage.crew %} · {{ voyage.crew }}{% endif %}
       · {{ voyage.legs | length }} leg{{ 's' if voyage.legs | length != 1 }}
     </div>

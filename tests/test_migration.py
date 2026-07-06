@@ -71,9 +71,13 @@ def test_migrates_old_schema(tmp_path):
             "SELECT name, crew, start_date, end_date, skipper, "
             "boat_name, boat_maker, boat_model, year_built FROM voyage"
         ).fetchone()
+        was_skipper = conn.exec_driver_sql("SELECT was_skipper FROM voyage").fetchone()[0]
     assert "boat" not in voyage_cols
     assert {"start_date", "end_date", "skipper",
-            "boat_name", "boat_maker", "boat_model", "year_built"} <= voyage_cols
+            "boat_name", "boat_maker", "boat_model", "year_built",
+            "was_skipper"} <= voyage_cols
+    # existing voyages backfill as crew (unchecked)
+    assert was_skipper == 0
     # existing data untouched: old combined boat value lands in boat_name,
     # the other new columns stay empty
     assert row == ("Chorvatsko 2026", "posádka", None, None, None,

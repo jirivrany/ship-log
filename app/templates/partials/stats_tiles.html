@@ -1,0 +1,36 @@
+{# Aggregate stat tiles — expects `stats` shaped like stats.aggregate_stats() #}
+<div class="d-flex flex-wrap gap-4">
+  <div>
+    <div class="text-muted small">Total</div>
+    <div class="fs-5 fw-bold">{{ stats.total_nm }} Nm</div>
+  </div>
+  {% if stats.motor_nm > 0 %}
+  <div>
+    <div class="text-muted small">Motor</div>
+    <div class="fs-5 fw-bold">{{ stats.motor_nm }} Nm</div>
+    <div class="text-muted small">{{ stats.motor_hhmm }}</div>
+  </div>
+  {% endif %}
+  {% if stats.sail_nm > 0 %}
+  <div>
+    <div class="text-muted small">Sail</div>
+    <div class="fs-5 fw-bold">{{ stats.sail_nm }} Nm</div>
+    <div class="text-muted small">{{ stats.sail_hhmm }}</div>
+  </div>
+  {% endif %}
+  {% if stats.both_nm > 0 %}
+  <div>
+    <div class="text-muted small">Motor + sail</div>
+    <div class="fs-5 fw-bold">{{ stats.both_nm }} Nm</div>
+    <div class="text-muted small">{{ stats.both_hhmm }}</div>
+  </div>
+  {% endif %}
+  <div class="border-start ps-4">
+    <div class="text-muted small">Time</div>
+    <div class="fs-5 fw-bold">{{ stats.duration_hhmm }}</div>
+  </div>
+  <div>
+    <div class="text-muted small">Voyages</div>
+    <div class="fs-5 fw-bold">{{ stats.voyage_count }}</div>
+  </div>
+</div>

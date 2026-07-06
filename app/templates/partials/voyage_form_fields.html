@@ -60,6 +60,11 @@
   <div class="col-md-4">
     <label class="form-label">Skipper</label>
     <input type="text" class="form-control" name="skipper" value="{{ v.skipper or '' }}">
+    <div class="form-check mt-1">
+      <input class="form-check-input" type="checkbox" name="was_skipper" id="was_skipper"
+             value="1" {% if v and v.was_skipper %}checked{% endif %}>
+      <label class="form-check-label" for="was_skipper">I was the skipper</label>
+    </div>
   </div>
   <div class="col-md-4">
     <label class="form-label">Crew</label>

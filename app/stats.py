@@ -57,4 +57,44 @@ def compute_stats(entries: list, *, wall_clock_duration: bool = True) -> dict:
         "both_hhmm":     _format_hhmm(min_by_prop.get("both",    0.0)),
         "entry_count": len(entries),
         "lap_count":   lap_count,
+        # unrounded values for cross-voyage aggregation (see aggregate_stats)
+        "raw": {
+            "total_nm":     total,
+            "motor_nm":     nm_by_prop.get("motor",  0.0),
+            "sail_nm":      nm_by_prop.get("sail",   0.0),
+            "both_nm":      nm_by_prop.get("both",   0.0),
+            "anchor_nm":    nm_by_prop.get("anchor", 0.0),
+            "duration_min": duration_minutes,
+            "motor_min":    min_by_prop.get("motor",  0.0),
+            "sail_min":     min_by_prop.get("sail",   0.0),
+            "both_min":     min_by_prop.get("both",   0.0),
+            "anchor_min":   min_by_prop.get("anchor", 0.0),
+        },
+    }
+
+
+def aggregate_stats(stats_list: list[dict]) -> dict:
+    """Sum per-voyage compute_stats() results into one formatted summary.
+
+    Sums the unrounded `raw` values (formatted H:MM strings and rounded Nm
+    are not safe to add), then formats like compute_stats. Total duration is
+    the sum of per-voyage wall-clock durations — wall clock across voyages
+    would span the gaps between them.
+    """
+    sums: dict[str, float] = {}
+    for stats in stats_list:
+        for key, value in stats["raw"].items():
+            sums[key] = sums.get(key, 0.0) + value
+
+    return {
+        "total_nm":   round(sums.get("total_nm",  0.0), 1),
+        "motor_nm":   round(sums.get("motor_nm",  0.0), 1),
+        "sail_nm":    round(sums.get("sail_nm",   0.0), 1),
+        "both_nm":    round(sums.get("both_nm",   0.0), 1),
+        "anchor_nm":  round(sums.get("anchor_nm", 0.0), 1),
+        "duration_hhmm": _format_hhmm(sums.get("duration_min", 0.0)),
+        "motor_hhmm":    _format_hhmm(sums.get("motor_min",    0.0)),
+        "sail_hhmm":     _format_hhmm(sums.get("sail_min",     0.0)),
+        "both_hhmm":     _format_hhmm(sums.get("both_min",     0.0)),
+        "voyage_count": len(stats_list),
     }

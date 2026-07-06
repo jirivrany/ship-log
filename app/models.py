@@ -41,6 +41,7 @@ class Voyage(SQLModel, table=True):
     call_sign: Optional[str] = None             # Volací značka
     owner: Optional[str] = None                 # Vlastník
     skipper: Optional[str] = None               # Kapitán
+    was_skipper: bool = Field(default=False)    # the app user was the skipper
     crew: Optional[str] = None                  # crew names
 
     # Boat technical specs (PDF: Hlavní údaje o plavidle)
@@ -72,6 +73,12 @@ class Voyage(SQLModel, table=True):
         if self.year_built:
             label += f" ({self.year_built})"
         return label
+
+
+class UserProfile(SQLModel, table=True):
+    """Single-row table: the app user's profile (single-user app)."""
+    id: Optional[int] = Field(default=None, primary_key=True)
+    name: Optional[str] = None
 
 
 class Leg(SQLModel, table=True):

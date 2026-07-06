@@ -134,6 +134,37 @@ def test_edit_dates_drive_strava_window(client, voyage, db_session):
     assert after is not None and before is not None and after < before
 
 
+def test_create_voyage_was_skipper_checked(client, db_session):
+    client.post("/voyages", data={
+        "name": "Skippered", "boat_name": "Diana", "was_skipper": "1",
+    })
+    v = db_session.exec(select(Voyage)).one()
+    assert v.was_skipper is True
+
+
+def test_edit_unchecked_checkbox_clears_was_skipper(client, voyage, db_session):
+    voyage.was_skipper = True
+    db_session.add(voyage)
+    db_session.commit()
+
+    # unchecked checkbox is absent from the POST body
+    client.post(f"/voyages/{voyage.id}/edit", data={
+        "name": "Original", "boat_name": "Bavaria 34",
+    })
+    db_session.refresh(voyage)
+    assert voyage.was_skipper is False
+
+
+def test_edit_form_renders_was_skipper_checked(client, voyage, db_session):
+    voyage.was_skipper = True
+    db_session.add(voyage)
+    db_session.commit()
+
+    r = client.get(f"/voyages/{voyage.id}/edit")
+    assert 'name="was_skipper"' in r.text
+    assert "checked" in r.text
+
+
 def test_edit_blank_field_clears_value(client, voyage, db_session):
     client.post(f"/voyages/{voyage.id}/edit", data={
         "name": "Original", "boat_name": "Bavaria 34", "skipper": "",
