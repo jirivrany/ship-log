@@ -1,13 +1,43 @@
 {
   "_readme": "Curated boat library. 'boats' are known hulls (name -> maker/model/year); 'models' hold model-level specs used to prefill the voyage form. Values are the standard/most common charter configuration — always confirm against the boat's papers. Extend with the /add-boat skill (.claude/skills/add-boat).",
   "boats": [
-    {"name": "Controvento", "maker": "Bavaria", "model": "Cruiser 45", "year_built": 2012},
-    {"name": "Joy", "maker": "Bavaria", "model": "Cruiser 40", "year_built": 2013},
-    {"name": "Eirené", "maker": "Bavaria", "model": "Cruiser 37", "year_built": 2017},
-    {"name": "La Gomera", "maker": "Maxus", "model": "33.1 RS", "year_built": 2019,
-     "note": "lake version with swing keel (centreboard): draft 0.45 m keel up / 1.70 m down"},
-    {"name": "Diana", "maker": "Bavaria", "model": "Cruiser 37", "year_built": 2017},
-    {"name": "Namaste", "maker": "Bavaria", "model": "Cruiser 34", "year_built": 2019}
+    {
+      "name": "Controvento",
+      "maker": "Bavaria",
+      "model": "Cruiser 45",
+      "year_built": 2012
+    },
+    {
+      "name": "Joy",
+      "maker": "Bavaria",
+      "model": "Cruiser 40",
+      "year_built": 2013
+    },
+    {
+      "name": "Eirené",
+      "maker": "Bavaria",
+      "model": "Cruiser 37",
+      "year_built": 2017
+    },
+    {
+      "name": "La Gomera",
+      "maker": "Maxus",
+      "model": "33.1 RS",
+      "year_built": 2019,
+      "note": "lake version with swing keel (centreboard): draft 0.45 m keel up / 1.70 m down"
+    },
+    {
+      "name": "Diana",
+      "maker": "Bavaria",
+      "model": "Cruiser 37",
+      "year_built": 2017
+    },
+    {
+      "name": "Namaste",
+      "maker": "Bavaria",
+      "model": "Cruiser 34",
+      "year_built": 2019
+    }
   ],
   "models": [
     {
@@ -19,7 +49,6 @@
       "draft_m": 2.1,
       "air_draft_m": 20.8,
       "engine_type": "Volvo Penta D2-55 diesel, saildrive",
-      "engine_power_kw": 40.5,
       "displacement_t": 12.6,
       "max_persons": 10,
       "sail_area_m2": 107,
@@ -28,7 +57,11 @@
       "water_tank_l": 360,
       "fuel_tank_l": 210,
       "notes": "shoal keel option 1.75 m; furling main reduces sail area",
-      "sources": ["boat-specs.com bavaria-cruiser-45-standard", "sailboatdata.com bavaria-cruiser-45"]
+      "sources": [
+        "boat-specs.com bavaria-cruiser-45-standard",
+        "sailboatdata.com bavaria-cruiser-45"
+      ],
+      "engine_power_hp": 55
     },
     {
       "maker": "Bavaria",
@@ -39,7 +72,6 @@
       "draft_m": 2.05,
       "air_draft_m": 17.5,
       "engine_type": "Volvo Penta diesel, saildrive",
-      "engine_power_kw": 21.6,
       "displacement_t": 8.68,
       "max_persons": 8,
       "sail_area_m2": 82,
@@ -48,7 +80,11 @@
       "water_tank_l": 360,
       "fuel_tank_l": 210,
       "notes": "shoal keel option 1.65 m; 40 hp (29 kW) engine option common in charter",
-      "sources": ["boat-specs.com bavaria-40-cruiser-farr-standard", "sailboatdata.com bavaria-cruiser-40-farr"]
+      "sources": [
+        "boat-specs.com bavaria-40-cruiser-farr-standard",
+        "sailboatdata.com bavaria-cruiser-40-farr"
+      ],
+      "engine_power_hp": 29
     },
     {
       "maker": "Bavaria",
@@ -59,7 +95,6 @@
       "draft_m": 1.95,
       "air_draft_m": 16.8,
       "engine_type": "Volvo Penta D1-30 diesel, saildrive",
-      "engine_power_kw": 21,
       "displacement_t": 7.0,
       "max_persons": 8,
       "sail_area_m2": 69,
@@ -68,7 +103,11 @@
       "water_tank_l": 210,
       "fuel_tank_l": 150,
       "notes": "shoal keel option 1.63 m; furling main reduces sail area",
-      "sources": ["boat-specs.com bavaria-cruiser-37-standard", "bavariayachts.com cruiser-37 data"]
+      "sources": [
+        "boat-specs.com bavaria-cruiser-37-standard",
+        "bavariayachts.com cruiser-37 data"
+      ],
+      "engine_power_hp": 29
     },
     {
       "maker": "Bavaria",
@@ -79,7 +118,6 @@
       "draft_m": 1.95,
       "air_draft_m": 14.9,
       "engine_type": "Volvo Penta D1-20 diesel, saildrive",
-      "engine_power_kw": 14,
       "displacement_t": 5.3,
       "max_persons": 8,
       "sail_area_m2": 51,
@@ -88,7 +126,11 @@
       "water_tank_l": 150,
       "fuel_tank_l": 150,
       "notes": "shoal keel option 1.55 m (some sources list standard draft 2.02 m); 30 hp engine option",
-      "sources": ["boat-specs.com bavaria-cruiser-34-standard", "itboat.com bavaria-cruiser-34"]
+      "sources": [
+        "boat-specs.com bavaria-cruiser-34-standard",
+        "itboat.com bavaria-cruiser-34"
+      ],
+      "engine_power_hp": 19
     },
     {
       "maker": "Maxus",
@@ -99,7 +141,6 @@
       "draft_m": 1.7,
       "air_draft_m": null,
       "engine_type": "inboard diesel, 15-20 hp (varies by outfit)",
-      "engine_power_kw": 15,
       "displacement_t": 4.5,
       "max_persons": 8,
       "sail_area_m2": 50,
@@ -108,7 +149,11 @@
       "water_tank_l": null,
       "fuel_tank_l": 30,
       "notes": "values for swing-keel (lake) version: draft 0.45 m keel up / 1.70 m down; fixed-keel version: draft 1.80 m, 5.0 t, 52 m2; berths 8+2",
-      "sources": ["northman.pl maxus-331-rs", "itboat.com northman-maxus-33-1-rs"]
+      "sources": [
+        "northman.pl maxus-331-rs",
+        "itboat.com northman-maxus-33-1-rs"
+      ],
+      "engine_power_hp": 20
     }
   ]
 }

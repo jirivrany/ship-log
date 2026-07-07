@@ -1,0 +1,100 @@
+{% extends "print/base_pdf.html" %}
+{% block content %}
+
+{# ---------- cover page (A4 portrait) ---------- #}
+<div class="cover-header">
+  <h1>Ship Log — {{ voyage.name }}</h1>
+  <div class="muted">
+    {{ voyage.start_date or "" }}{% if voyage.start_date or voyage.end_date %} – {% endif %}{{ voyage.end_date or "" }}
+    {% if voyage.area %} &nbsp;·&nbsp; {{ area_labels[voyage.area.value] }}{% endif %}
+  </div>
+</div>
+
+<div class="columns section">
+  <div>
+    <h3>Vessel</h3>
+    <table class="plain">
+      <tr><th>Boat</th><td>{{ voyage.boat_label }}</td></tr>
+      {% if voyage.registration_number %}<tr><th>Registration</th><td>{{ voyage.registration_number }}</td></tr>{% endif %}
+      {% if voyage.home_port %}<tr><th>Home port</th><td>{{ voyage.home_port }}</td></tr>{% endif %}
+      {% if voyage.call_sign %}<tr><th>Call sign</th><td>{{ voyage.call_sign }}</td></tr>{% endif %}
+      {% if voyage.owner %}<tr><th>Owner</th><td>{{ voyage.owner }}</td></tr>{% endif %}
+    </table>
+  </div>
+  <div>
+    <h3>Crew</h3>
+    <table class="plain">
+      {% if voyage.skipper %}<tr><th>Skipper</th><td>{{ voyage.skipper }}</td></tr>{% endif %}
+      {% if voyage.crew %}<tr><th>Crew</th><td>{{ voyage.crew }}</td></tr>{% endif %}
+    </table>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Main particulars</h3>
+  <div class="columns">
+    <div>
+      <table class="plain">
+        {% if voyage.length_m %}<tr><th>Length</th><td>{{ voyage.length_m }} m</td></tr>{% endif %}
+        {% if voyage.beam_m %}<tr><th>Beam</th><td>{{ voyage.beam_m }} m</td></tr>{% endif %}
+        {% if voyage.draft_m %}<tr><th>Draft</th><td>{{ voyage.draft_m }} m</td></tr>{% endif %}
+        {% if voyage.air_draft_m %}<tr><th>Air draft</th><td>{{ voyage.air_draft_m }} m</td></tr>{% endif %}
+        {% if voyage.displacement_t %}<tr><th>Displacement</th><td>{{ voyage.displacement_t }} t</td></tr>{% endif %}
+        {% if voyage.max_persons %}<tr><th>Max persons</th><td>{{ voyage.max_persons }}</td></tr>{% endif %}
+      </table>
+    </div>
+    <div>
+      <table class="plain">
+        {% if voyage.engine_type or voyage.engine_power_hp %}<tr><th>Engine</th><td>{{ voyage.engine_type or "" }}{% if voyage.engine_power_hp %} {{ voyage.engine_power_hp }} hp{% endif %}</td></tr>{% endif %}
+        {% if voyage.sail_area_m2 %}<tr><th>Sail area</th><td>{{ voyage.sail_area_m2 }} m²</td></tr>{% endif %}
+        {% if voyage.mainsail_m2 %}<tr><th>Mainsail</th><td>{{ voyage.mainsail_m2 }} m²</td></tr>{% endif %}
+        {% if voyage.genoa_m2 %}<tr><th>Genoa</th><td>{{ voyage.genoa_m2 }} m²</td></tr>{% endif %}
+        {% if voyage.fuel_tank_l %}<tr><th>Fuel tank</th><td>{{ voyage.fuel_tank_l }} l</td></tr>{% endif %}
+        {% if voyage.water_tank_l %}<tr><th>Water tank</th><td>{{ voyage.water_tank_l }} l</td></tr>{% endif %}
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Voyage summary</h3>
+  <table>
+    <thead>
+      <tr><th>Date</th><th>Leg</th><th>Total Nm</th><th>Sail Nm</th><th>Engine Nm</th><th>Duration</th></tr>
+    </thead>
+    <tbody>
+      {% for c in legs %}
+      <tr>
+        <td>{{ c.leg.date }}</td>
+        <td>{{ c.leg.from_port }} → {{ c.leg.to_port }}</td>
+        <td>{{ c.stats.total_nm }}</td>
+        <td>{{ c.stats.sail_nm }}</td>
+        <td>{{ c.stats.motor_nm }}</td>
+        <td>{{ c.stats.duration_hhmm }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+    <tfoot>
+      <tr>
+        <th>Total</th><th></th>
+        <th>{{ voyage_stats.total_nm }}</th>
+        <th>{{ voyage_stats.sail_nm }}</th>
+        <th>{{ voyage_stats.motor_nm }}</th>
+        <th>{{ voyage_stats.duration_hhmm }}</th>
+      </tr>
+    </tfoot>
+  </table>
+</div>
+
+<p class="muted small">Exported {{ generated_on }} · ship-log</p>
+
+{# ---------- one day page per leg ---------- #}
+{% for c in legs %}
+  {% with leg=c.leg, local_entries=c.local_entries, local_notes=c.local_notes,
+          stats=c.stats, weather=c.weather,
+          track_map_uri=c.track_map_uri, synoptic_chart_uri=c.synoptic_chart_uri %}
+    {% include "print/day_page.html" %}
+  {% endwith %}
+{% endfor %}
+
+{% endblock %}

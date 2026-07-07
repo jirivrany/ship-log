@@ -3,11 +3,12 @@ import shutil
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from sqlmodel import Session, select
 
 from app import boat_library
 from app.database import get_session
+from app.export import export_filename, leg_context, render_voyage_pdf
 from app.models import Leg, LogEntry, NavArea, Voyage
 from app.processors import loader
 from app.stats import compute_stats
@@ -26,7 +27,7 @@ _VOYAGE_STR_FIELDS = (
     "call_sign", "owner", "skipper", "crew", "engine_type",
 )
 _VOYAGE_FLOAT_FIELDS = (
-    "length_m", "beam_m", "draft_m", "air_draft_m", "engine_power_kw",
+    "length_m", "beam_m", "draft_m", "air_draft_m", "engine_power_hp",
     "displacement_t", "sail_area_m2", "mainsail_m2", "genoa_m2",
 )
 _VOYAGE_INT_FIELDS = ("year_built", "max_persons", "water_tank_l", "fuel_tank_l")
@@ -125,6 +126,22 @@ def voyage_detail(voyage_id: int, request: Request, session: Session = Depends(g
         "leg_stats": leg_stats,
         "voyage_stats": voyage_stats,
         "leg_tracks": leg_tracks,
+    })
+
+
+@router.get("/voyages/{voyage_id}/export.pdf")
+def export_voyage_pdf(voyage_id: int, session: Session = Depends(get_session)):
+    """The whole voyage as a printable logbook PDF (works mid-voyage too)."""
+    voyage = session.get(Voyage, voyage_id)
+    if not voyage:
+        return HTMLResponse("Not found", status_code=404)
+    legs, leg_entries = gather_voyage_entries(session, voyage)
+
+    contexts = [leg_context(leg, leg_entries[leg.id]) for leg in legs]
+    pdf = render_voyage_pdf(voyage, contexts)
+
+    return Response(pdf, media_type="application/pdf", headers={
+        "Content-Disposition": f'attachment; filename="{export_filename(voyage)}"',
     })
 
 

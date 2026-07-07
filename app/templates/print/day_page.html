@@ -1,0 +1,92 @@
+{# One logbook day page (A4 landscape). Context: leg, local_entries,
+   local_notes, stats, weather, track_map_uri, synoptic_chart_uri #}
+<section class="day-page {{ 'first-page' if first_page }}">
+  <div class="day-header">
+    <span class="route">{{ leg.from_port }} → {{ leg.to_port }}</span>
+    <span>
+      {{ leg.date | datetimeformat("%A") }} {{ leg.date }}
+      &nbsp;·&nbsp; times in {{ leg.timezone }}
+      {% if leg.sunrise or leg.sunset %}
+        &nbsp;·&nbsp; ☀ {{ leg.sunrise or "—" }} – {{ leg.sunset or "—" }}
+      {% endif %}
+    </span>
+  </div>
+
+  {% if leg.forecast or leg.warnings or leg.synoptic_situation %}
+  <div class="forecast-row">
+    <div><h3>Wind forecast</h3>{{ leg.forecast or "—" }}</div>
+    <div><h3>Warnings</h3>{{ leg.warnings or "—" }}</div>
+    <div><h3>Synoptic situation</h3>{{ leg.synoptic_situation or "—" }}</div>
+  </div>
+  {% endif %}
+
+  {% if track_map_uri or synoptic_chart_uri %}
+  <div class="images-row">
+    {% if track_map_uri %}
+    <figure>
+      <img src="{{ track_map_uri }}" alt="Track map">
+      <figcaption>{{ map_attribution }}</figcaption>
+    </figure>
+    {% endif %}
+    {% if synoptic_chart_uri %}
+    <figure>
+      <img src="{{ synoptic_chart_uri }}" alt="Synoptic chart">
+      <figcaption>MSLP + 850 hPa wind · {{ synoptic_attribution }}</figcaption>
+    </figure>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% if local_entries %}
+  <table class="entries">
+    <thead>
+      <tr>
+        <th>Time</th><th>Position</th><th>COG°</th><th>SOG kn</th><th>Log Nm</th>
+        <th>Propulsion</th><th>Sails</th><th>Wind</th><th>Bf</th><th>Sea</th>
+        <th>Cloud /8</th><th>hPa</th><th>°C</th><th>Notes</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for entry, local_time in local_entries %}
+      <tr>
+        <td>{{ local_time }}</td>
+        <td>{% if entry.lat is not none and entry.lon is not none %}{{ "%.4f"|format(entry.lat) }}, {{ "%.4f"|format(entry.lon) }}{% else %}—{% endif %}</td>
+        <td>{{ entry.course | int if entry.course else "—" }}</td>
+        <td>{{ "%.1f"|format(entry.speed) if entry.speed else "—" }}</td>
+        <td>{{ "%.1f"|format(entry.log_value) if entry.log_value else "—" }}</td>
+        <td>{{ entry.propulsion.value }}</td>
+        <td>{{ entry.sails or "—" }}</td>
+        <td>{{ entry.wind_direction or "—" }}</td>
+        <td>{{ entry.wind_force if entry.wind_force is not none else "—" }}</td>
+        <td>{{ entry.sea_state if entry.sea_state is not none else "—" }}</td>
+        <td>{{ entry.cloud_cover if entry.cloud_cover is not none else "—" }}</td>
+        <td>{{ entry.atmospheric_pressure or "—" }}</td>
+        <td>{{ entry.air_temperature if entry.air_temperature is not none else "—" }}</td>
+        <td>{{ entry.notes or "" }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <div class="totals">
+    <span>Total <b>{{ stats.total_nm }} Nm</b> ({{ stats.duration_hhmm }})</span>
+    <span>Under sail <b>{{ stats.sail_nm }} Nm</b> ({{ stats.sail_hhmm }})</span>
+    <span>Under engine <b>{{ stats.motor_nm }} Nm</b> ({{ stats.motor_hhmm }})</span>
+    {% if stats.both_nm %}<span>Motorsailing <b>{{ stats.both_nm }} Nm</b> ({{ stats.both_hhmm }})</span>{% endif %}
+    {% if weather %}<span class="muted small">{{ weather }}</span>{% endif %}
+  </div>
+  {% else %}
+  <p class="muted">No log entries recorded for this leg.</p>
+  {% endif %}
+
+  {% if local_notes %}
+  <div class="notes-block">
+    <h3>Notes</h3>
+    <table class="plain">
+      {% for entry, local_time in local_notes %}
+      <tr><th>{{ local_time }}</th><td>{{ entry.notes }}</td></tr>
+      {% endfor %}
+    </table>
+  </div>
+  {% endif %}
+</section>

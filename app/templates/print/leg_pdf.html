@@ -1,0 +1,7 @@
+{% extends "print/base_pdf.html" %}
+{% block content %}
+  {% with first_page=true %}
+    {% include "print/day_page.html" %}
+  {% endwith %}
+  <p class="muted small">{{ voyage.name }} · {{ voyage.boat_label }} · exported {{ generated_on }}</p>
+{% endblock %}

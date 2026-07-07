@@ -66,6 +66,18 @@ def migrate_schema(target_engine) -> None:
             if "area" not in voyage_cols:
                 conn.exec_driver_sql("ALTER TABLE voyage ADD COLUMN area VARCHAR")
 
+            # 2026-07: engine power kW -> hp (hp is what boat specs and sailors use)
+            if "engine_power_kw" in voyage_cols:
+                conn.exec_driver_sql(
+                    "ALTER TABLE voyage RENAME COLUMN engine_power_kw TO engine_power_hp"
+                )
+                conn.exec_driver_sql(
+                    "UPDATE voyage SET engine_power_hp = ROUND(engine_power_hp * 1.34102, 1) "
+                    "WHERE engine_power_hp IS NOT NULL"
+                )
+            elif "engine_power_hp" not in voyage_cols:
+                conn.exec_driver_sql("ALTER TABLE voyage ADD COLUMN engine_power_hp FLOAT")
+
         # 2026-07: weather enrichment — exact wind speed + provenance marker
         entry_cols = {row[1] for row in conn.exec_driver_sql("PRAGMA table_info(logentry)").fetchall()}
         if entry_cols:

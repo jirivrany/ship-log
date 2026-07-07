@@ -87,6 +87,32 @@ def test_migrates_old_schema(tmp_path):
                    "Bavaria", None, None, None)
 
 
+def test_engine_power_kw_converts_to_hp(tmp_path):
+    engine = create_engine(f"sqlite:///{tmp_path}/kw.db")
+    with engine.connect() as conn:
+        conn.exec_driver_sql(OLD_SCHEMA)
+        conn.exec_driver_sql(
+            "CREATE TABLE voyage (id INTEGER PRIMARY KEY, name VARCHAR NOT NULL, "
+            "boat_name VARCHAR NOT NULL, engine_power_kw FLOAT)"
+        )
+        conn.exec_driver_sql(
+            "INSERT INTO voyage (name, boat_name, engine_power_kw) "
+            "VALUES ('Zadar', 'Diana', 21.0), ('Kurz', 'Joy', NULL)"
+        )
+        conn.commit()
+
+    migrate_schema(engine)
+
+    with engine.connect() as conn:
+        voyage_cols = {r[1] for r in conn.exec_driver_sql("PRAGMA table_info(voyage)").fetchall()}
+        rows = conn.exec_driver_sql(
+            "SELECT engine_power_hp FROM voyage ORDER BY id"
+        ).fetchall()
+    assert "engine_power_kw" not in voyage_cols
+    # Volvo D1-30: 21 kW -> 28.2 hp; empty stays empty
+    assert rows == [(28.2,), (None,)]
+
+
 def test_migration_is_idempotent(tmp_path):
     engine = _old_db_engine(tmp_path)
     migrate_schema(engine)

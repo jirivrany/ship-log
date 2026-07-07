@@ -6,6 +6,7 @@
   <a href="/" class="text-muted small text-decoration-none">← All Voyages</a>
   <div class="d-flex gap-2">
     <a href="/voyages/{{ voyage.id }}/edit" class="btn btn-outline-primary btn-sm">Edit</a>
+    <a href="/voyages/{{ voyage.id }}/export.pdf" class="btn btn-outline-primary btn-sm">⬇ Export PDF</a>
     <a href="/voyages/{{ voyage.id }}/legs/quick/new" class="btn btn-outline-primary btn-sm">Start leg now</a>
     <a href="/voyages/{{ voyage.id }}/strava" class="btn btn-outline-primary btn-sm">Import from Strava</a>
     <a href="/voyages/{{ voyage.id }}/legs/new" class="btn btn-primary btn-sm">+ Add Leg</a>
@@ -133,11 +134,11 @@
       </div>
       {% endif %}
 
-      {% if voyage.engine_type or voyage.engine_power_kw %}
+      {% if voyage.engine_type or voyage.engine_power_hp %}
       <div class="mb-3">
         <div class="text-uppercase text-muted fw-semibold mb-1" style="font-size:10px;letter-spacing:.06em">Engine</div>
         {% if voyage.engine_type %}<div class="d-flex justify-content-between border-bottom py-1 small"><span class="text-muted">Type</span><span class="fw-medium">{{ voyage.engine_type }}</span></div>{% endif %}
-        {% if voyage.engine_power_kw %}<div class="d-flex justify-content-between border-bottom py-1 small"><span class="text-muted">Power</span><span class="fw-medium">{{ voyage.engine_power_kw }} kW</span></div>{% endif %}
+        {% if voyage.engine_power_hp %}<div class="d-flex justify-content-between border-bottom py-1 small"><span class="text-muted">Power</span><span class="fw-medium">{{ voyage.engine_power_hp }} hp</span></div>{% endif %}
       </div>
       {% endif %}
 

@@ -21,6 +21,7 @@
 <div class="d-flex align-items-center gap-3 mb-4 flex-wrap">
   <p class="text-muted mb-0">{{ leg.date }}</p>
   <a href="/legs/{{ leg.id }}/quick-note" class="btn btn-outline-primary btn-sm">+ Quick Note</a>
+  <a href="/legs/{{ leg.id }}/export.pdf" class="btn btn-outline-primary btn-sm">⬇ Export PDF</a>
   {% if not leg.track_path %}
   <a href="/legs/{{ leg.id }}/attach-track" class="btn btn-outline-primary btn-sm">Attach track file</a>
   {% endif %}

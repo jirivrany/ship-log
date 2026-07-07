@@ -6,10 +6,11 @@ from typing import Optional
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
 from sqlmodel import Session, select
 
 from app.database import get_session
+from app.export import export_filename, leg_context, render_leg_pdf
 from app.forecast import fetch_leg_forecast, geocode_port
 from app.forecast_apply import apply_forecast
 from app.models import EntrySource, Leg, LogEntry, PropulsionType, Voyage
@@ -442,6 +443,23 @@ def fetch_leg_forecast_route(
     return RedirectResponse(
         f"/legs/{leg_id}?forecast_msg={urllib.parse.quote(msg)}", status_code=303
     )
+
+
+@router.get("/legs/{leg_id}/export.pdf")
+def export_leg_pdf(leg_id: int, session: Session = Depends(get_session)):
+    """One leg as a standalone logbook day page."""
+    leg = session.get(Leg, leg_id)
+    if not leg:
+        return HTMLResponse("Not found", status_code=404)
+    entries = session.exec(
+        select(LogEntry).where(LogEntry.leg_id == leg_id).order_by(LogEntry.timestamp)
+    ).all()
+
+    pdf = render_leg_pdf(leg.voyage, leg_context(leg, entries))
+
+    return Response(pdf, media_type="application/pdf", headers={
+        "Content-Disposition": f'attachment; filename="{export_filename(leg.voyage, leg)}"',
+    })
 
 
 @router.get("/legs/{leg_id}/synoptic-chart")

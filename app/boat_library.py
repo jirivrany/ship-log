@@ -16,7 +16,7 @@ LIBRARY_PATH = Path(__file__).parent / "boat_library.json"
 # Voyage spec columns a model entry may prefill (must match models.Voyage)
 SPEC_FIELDS = (
     "length_m", "beam_m", "draft_m", "air_draft_m", "engine_type",
-    "engine_power_kw", "displacement_t", "max_persons", "sail_area_m2",
+    "engine_power_hp", "displacement_t", "max_persons", "sail_area_m2",
     "mainsail_m2", "genoa_m2", "water_tank_l", "fuel_tank_l",
 )
 
