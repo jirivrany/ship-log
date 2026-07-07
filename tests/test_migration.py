@@ -55,6 +55,9 @@ def test_migrates_old_schema(tmp_path):
     cols = _columns(engine)
     assert "fit_path" not in cols
     assert {"track_path", "track_source", "strava_activity_id"} <= cols
+    # 2026-07: forecast block
+    assert {"synoptic_situation", "forecast", "warnings", "sunrise", "sunset",
+            "forecast_source", "synoptic_chart_path"} <= cols
 
     with engine.connect() as conn:
         rows = conn.exec_driver_sql(

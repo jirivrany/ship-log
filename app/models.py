@@ -113,6 +113,16 @@ class Leg(SQLModel, table=True):
     track_source: Optional[TrackSource] = None
     strava_activity_id: Optional[int] = None  # set for Strava imports; used for duplicate detection
 
+    # Forecast block (PDF: KWS "Předpověď počasí" page) — manually filled,
+    # or prefilled by the forecast fetch (see forecast_source)
+    synoptic_situation: Optional[str] = None
+    forecast: Optional[str] = None            # wind forecast text
+    warnings: Optional[str] = None            # official warnings (manual)
+    sunrise: Optional[str] = None             # HH:MM in leg-local time
+    sunset: Optional[str] = None              # HH:MM in leg-local time
+    forecast_source: Optional[str] = None     # "open-meteo" when auto-filled; None = skipper's own
+    synoptic_chart_path: Optional[str] = None  # stored ECMWF chart PNG (CC-BY-4.0)
+
     voyage: Optional[Voyage] = Relationship(back_populates="legs")
     log_entries: list["LogEntry"] = Relationship(back_populates="leg")
 
@@ -131,6 +141,7 @@ class LogEntry(SQLModel, table=True):
 
     # manually filled (or prefilled by the weather fetch — see weather_source)
     propulsion: PropulsionType = Field(default=PropulsionType.motor)
+    sails: Optional[str] = None           # sails set, e.g. "Main R1 + Genoa"
     wind_direction: Optional[str] = None  # e.g. "NW" or "315"
     wind_force: Optional[int] = None      # Beaufort
     wind_speed_kn: Optional[float] = None  # exact wind speed, knots

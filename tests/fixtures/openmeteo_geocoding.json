@@ -1,0 +1,20 @@
+{
+ "results": [
+  {
+   "id": 3187485,
+   "name": "Vodice",
+   "latitude": 46.18987,
+   "longitude": 14.49492,
+   "elevation": 338.0,
+   "feature_code": "PPLA",
+   "country_code": "SI",
+   "admin1_id": 3239112,
+   "timezone": "Europe/Ljubljana",
+   "population": 1589,
+   "country_id": 3190538,
+   "country": "Slovenia",
+   "admin1": "Municipality of Vodice"
+  }
+ ],
+ "generationtime_ms": 0.33533573
+}

@@ -35,6 +35,61 @@
   {% if weather_msg %}<span class="small text-success">{{ weather_msg }}</span>{% endif %}
 </div>
 
+<div class="card p-3 mb-4">
+  <div class="d-flex align-items-center gap-3 mb-2 flex-wrap">
+    <h2 class="h6 fw-semibold mb-0">Forecast</h2>
+    {% if leg.forecast_source %}<span title="prefilled from {{ leg.forecast_source }}">⛅</span>{% endif %}
+    <span class="small text-muted d-flex align-items-center gap-1">
+      ☀
+      <input type="time" value="{{ leg.sunrise or '' }}" class="input-sm"
+             title="Sunrise"
+             hx-patch="/legs/{{ leg.id }}" hx-trigger="blur" hx-swap="none"
+             hx-vals='js:{"field": "sunrise", "value": event.target.value}'>
+      –
+      <input type="time" value="{{ leg.sunset or '' }}" class="input-sm"
+             title="Sunset"
+             hx-patch="/legs/{{ leg.id }}" hx-trigger="blur" hx-swap="none"
+             hx-vals='js:{"field": "sunset", "value": event.target.value}'>
+    </span>
+    <form method="post" action="/legs/{{ leg.id }}/fetch-forecast" class="d-flex align-items-center gap-2 mb-0 ms-auto">
+      <button type="submit" class="btn btn-outline-primary btn-sm">⛅ Fetch forecast</button>
+      <label class="small text-muted d-flex align-items-center gap-1 mb-0">
+        <input type="checkbox" name="overwrite" class="form-check-input mt-0"> overwrite existing
+      </label>
+    </form>
+  </div>
+  {% if forecast_msg %}<div class="small text-success mb-2">{{ forecast_msg }}</div>{% endif %}
+  <div class="row g-2">
+    <div class="col-md-4">
+      <label class="form-label small text-muted mb-1">Wind forecast</label>
+      <textarea rows="2" class="form-control form-control-sm" placeholder="Morning NW 3-4 Bf…"
+                hx-patch="/legs/{{ leg.id }}" hx-trigger="blur" hx-swap="none"
+                hx-vals='js:{"field": "forecast", "value": event.target.value}'>{{ leg.forecast or '' }}</textarea>
+    </div>
+    <div class="col-md-4">
+      <label class="form-label small text-muted mb-1">Warnings</label>
+      <textarea rows="2" class="form-control form-control-sm" placeholder="Gale warnings, bora…"
+                hx-patch="/legs/{{ leg.id }}" hx-trigger="blur" hx-swap="none"
+                hx-vals='js:{"field": "warnings", "value": event.target.value}'>{{ leg.warnings or '' }}</textarea>
+    </div>
+    <div class="col-md-4">
+      <label class="form-label small text-muted mb-1">Synoptic situation</label>
+      <textarea rows="2" class="form-control form-control-sm" placeholder="Azores high ridge over the Adriatic…"
+                hx-patch="/legs/{{ leg.id }}" hx-trigger="blur" hx-swap="none"
+                hx-vals='js:{"field": "synoptic_situation", "value": event.target.value}'>{{ leg.synoptic_situation or '' }}</textarea>
+    </div>
+  </div>
+  {% if leg.synoptic_chart_path %}
+  <details class="mt-2">
+    <summary class="small text-muted">Synoptic chart (MSLP + 850 hPa wind)</summary>
+    <a href="/legs/{{ leg.id }}/synoptic-chart" target="_blank">
+      <img src="/legs/{{ leg.id }}/synoptic-chart" alt="Synoptic chart" class="img-fluid mt-2 border rounded" style="max-height: 420px">
+    </a>
+    <div class="small text-muted mt-1">Chart © ECMWF (CC-BY-4.0)</div>
+  </details>
+  {% endif %}
+</div>
+
 {% if local_entries %}
 <div class="card p-3 mb-4">
   <h2 class="h6 fw-semibold mb-3">Summary</h2>
@@ -81,6 +136,17 @@
   <span class="text-muted small">Times in {{ tz_name }} &nbsp;·&nbsp; Fields save automatically when you leave them</span>
 </div>
 
+<datalist id="sail-options">
+  <option value="Main + Genoa"></option>
+  <option value="Main R1 + Genoa"></option>
+  <option value="Main R2 + Jib"></option>
+  <option value="Main"></option>
+  <option value="Genoa"></option>
+  <option value="Jib"></option>
+  <option value="Spinnaker"></option>
+  <option value="Gennaker"></option>
+</datalist>
+
 <div class="table-responsive border rounded">
   <table class="log-table table table-sm table-hover mb-0">
     <thead class="table-light">
@@ -92,6 +158,7 @@
         <th>Log Nm</th>
         <th>Source</th>
         <th>Propulsion</th>
+        <th>Sails</th>
         <th>Wind dir</th>
         <th>Wind Bf</th>
         <th>Sea</th>
@@ -122,6 +189,7 @@
       time: "{{ local_time }}",
       cog: {{ entry.course | int if entry.course else 'null' }},
       sog: {{ "%.1f"|format(entry.speed) if entry.speed else 'null' }},
+      sails: {{ entry.sails | tojson }},
       windDir: {{ entry.wind_direction | tojson }},
       windBf: {{ entry.wind_force | tojson }},
       windKn: {{ entry.wind_speed_kn | tojson }},
@@ -251,6 +319,7 @@
 
   function weatherLines(e) {
     const lines = [];
+    if (e.sails) lines.push(`Sails ${e.sails}`);
     if (e.windDir != null || e.windBf != null) {
       const kn = e.windKn != null ? ` (${e.windKn} kn)` : '';
       lines.push(`Wind ${e.windDir ?? ''} ${e.windBf != null ? e.windBf + ' Bf' : ''}${kn}`.replace(/\s+/g, ' ').trim());

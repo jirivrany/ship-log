@@ -11,6 +11,7 @@ router = APIRouter()
 
 FIELD_SETTERS = {
     "propulsion":           lambda e, v: setattr(e, "propulsion", PropulsionType(v) if v else PropulsionType.motor),
+    "sails":                lambda e, v: setattr(e, "sails", v or None),
     "wind_direction":       lambda e, v: setattr(e, "wind_direction", v or None),
     "wind_force":           lambda e, v: setattr(e, "wind_force", int(v) if v else None),
     "sea_state":            lambda e, v: setattr(e, "sea_state", int(v) if v else None),

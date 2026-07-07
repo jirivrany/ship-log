@@ -6,15 +6,18 @@ from typing import Optional
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from sqlmodel import Session, select
 
 from app.database import get_session
+from app.forecast import fetch_leg_forecast, geocode_port
+from app.forecast_apply import apply_forecast
 from app.models import EntrySource, Leg, LogEntry, PropulsionType, Voyage
 from app.processors import loader
 from app.processors.merge import build_log_entries
 from app.processors.notes import create_quick_note, filter_note_entries
 from app.stats import compute_stats, weather_summary
+from app.synoptic import fetch_synoptic_chart
 from app.templates_env import templates
 from app.weather import fetch_weather
 from app.weather_apply import apply_weather
@@ -351,7 +354,102 @@ def leg_detail(leg_id: int, request: Request, session: Session = Depends(get_ses
         "stats": stats,
         "weather": weather_summary(entries),
         "weather_msg": request.query_params.get("weather_msg"),
+        "forecast_msg": request.query_params.get("forecast_msg"),
     })
+
+
+def _forecast_position(leg: Leg, session: Session) -> Optional[tuple[float, float, Optional[str]]]:
+    """(lat, lon, note) for the forecast fetch. Known positions win over
+    geocoding — port names are ambiguous across countries — so: this leg's
+    first positioned entry, else the previous leg's last position, else the
+    geocoded departure port (with a label so a wrong hit is visible)."""
+    first = session.exec(
+        select(LogEntry).where(LogEntry.leg_id == leg.id, LogEntry.lat.isnot(None))
+        .order_by(LogEntry.timestamp)
+    ).first()
+    if first:
+        return first.lat, first.lon, None
+
+    previous = session.exec(
+        select(Leg).where(Leg.voyage_id == leg.voyage_id, Leg.date < leg.date)
+        .order_by(Leg.date.desc())
+    ).first()
+    if previous:
+        last = session.exec(
+            select(LogEntry).where(LogEntry.leg_id == previous.id, LogEntry.lat.isnot(None))
+            .order_by(LogEntry.timestamp.desc())
+        ).first()
+        if last:
+            return last.lat, last.lon, None
+
+    place = geocode_port(leg.from_port)
+    if place:
+        return place.lat, place.lon, f"position: {place.label}"
+    return None
+
+
+def _leg_dir(leg: Leg) -> Optional[str]:
+    """The leg's file directory (same convention as track storage); None if
+    the stored port names would escape the upload root."""
+    upload_root = pathlib.Path(UPLOAD_DIR).resolve()
+    leg_dir = pathlib.Path(
+        UPLOAD_DIR, f"voyage_{leg.voyage_id}", f"{leg.date}_{leg.from_port}-{leg.to_port}"
+    )
+    if not leg_dir.resolve().is_relative_to(upload_root):
+        return None
+    return str(leg_dir)
+
+
+@router.post("/legs/{leg_id}/fetch-forecast")
+def fetch_leg_forecast_route(
+    leg_id: int,
+    overwrite: bool = Form(False),
+    session: Session = Depends(get_session),
+):
+    """Prefill the leg's forecast block (sun times, wind text, synoptic chart)."""
+    leg = session.get(Leg, leg_id)
+    if not leg:
+        return HTMLResponse("Not found", status_code=404)
+
+    position = _forecast_position(leg, session)
+    if position is None:
+        msg = f"No position found — could not geocode “{leg.from_port}”"
+    else:
+        lat, lon, position_note = position
+        filled = []
+        fc = fetch_leg_forecast(leg.date, lat, lon, leg.timezone)
+        if fc and apply_forecast(leg, fc, overwrite=overwrite):
+            filled.append("sun times & wind")
+
+        leg_dir = _leg_dir(leg)
+        if leg_dir and (leg.synoptic_chart_path is None or overwrite):
+            chart = fetch_synoptic_chart(leg.date, leg_dir)
+            if chart:
+                leg.synoptic_chart_path = chart
+                filled.append("synoptic chart")
+
+        if filled:
+            session.add(leg)
+            session.commit()
+            msg = f"Forecast filled: {', '.join(filled)}"
+            if position_note:
+                msg += f" ({position_note})"
+        elif fc:
+            msg = "Nothing to fill — forecast fields already have values (tick overwrite to refresh)"
+        else:
+            msg = "No forecast data available right now — try again later"
+
+    return RedirectResponse(
+        f"/legs/{leg_id}?forecast_msg={urllib.parse.quote(msg)}", status_code=303
+    )
+
+
+@router.get("/legs/{leg_id}/synoptic-chart")
+def synoptic_chart(leg_id: int, session: Session = Depends(get_session)):
+    leg = session.get(Leg, leg_id)
+    if not leg or not leg.synoptic_chart_path or not os.path.exists(leg.synoptic_chart_path):
+        return HTMLResponse("Not found", status_code=404)
+    return FileResponse(leg.synoptic_chart_path, media_type="image/png")
 
 
 @router.post("/legs/{leg_id}/fetch-weather")
@@ -506,6 +604,10 @@ def add_manual_entry(
     )
 
 
+# Editing any of these by hand turns the block back into a skipper record.
+LEG_FORECAST_FIELDS = {"synoptic_situation", "forecast", "warnings", "sunrise", "sunset"}
+
+
 @router.patch("/legs/{leg_id}", response_class=HTMLResponse)
 def patch_leg(
     leg_id: int,
@@ -520,6 +622,9 @@ def patch_leg(
         leg.from_port = value.strip() or leg.from_port
     elif field == "to_port":
         leg.to_port = value.strip() or leg.to_port
+    elif field in LEG_FORECAST_FIELDS:
+        setattr(leg, field, value.strip() or None)
+        leg.forecast_source = None
     session.add(leg)
     session.commit()
     return HTMLResponse("")

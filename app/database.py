@@ -31,6 +31,12 @@ def migrate_schema(target_engine) -> None:
         if "strava_activity_id" not in cols:
             conn.exec_driver_sql("ALTER TABLE leg ADD COLUMN strava_activity_id INTEGER")
 
+        # 2026-07: leg forecast block (synoptic situation, warnings, sun times)
+        for col in ("synoptic_situation", "forecast", "warnings", "sunrise",
+                    "sunset", "forecast_source", "synoptic_chart_path"):
+            if col not in cols:
+                conn.exec_driver_sql(f"ALTER TABLE leg ADD COLUMN {col} VARCHAR")
+
         # 2026-07: voyage start/end dates (drive Strava import window) + skipper
         voyage_cols = {row[1] for row in conn.exec_driver_sql("PRAGMA table_info(voyage)").fetchall()}
         if voyage_cols:
@@ -67,6 +73,10 @@ def migrate_schema(target_engine) -> None:
                 conn.exec_driver_sql("ALTER TABLE logentry ADD COLUMN wind_speed_kn FLOAT")
             if "weather_source" not in entry_cols:
                 conn.exec_driver_sql("ALTER TABLE logentry ADD COLUMN weather_source VARCHAR")
+
+            # 2026-07: sail configuration per entry
+            if "sails" not in entry_cols:
+                conn.exec_driver_sql("ALTER TABLE logentry ADD COLUMN sails VARCHAR")
 
         conn.commit()
 

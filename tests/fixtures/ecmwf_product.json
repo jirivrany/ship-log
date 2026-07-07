@@ -1,0 +1,24 @@
+{
+ "data": {
+  "type": "graphical_product",
+  "attributes": {
+   "name": "medium-mslp-wind850",
+   "title": "Mean sea level pressure and 850 hPa wind speed",
+   "description": "Base time: Tue 07 Jul 2026 06 UTC Valid time: Wed 08 Jul 2026 12 UTC (+30h) Area : South East Europe"
+  },
+  "link": {
+   "href": "https://charts.ecmwf.int/content/20260707171438-b2ce997db950ed443dcdf92e22b040a145f52376.png",
+   "type": "image/png"
+  }
+ },
+ "meta": {
+  "copyright": "\u00a92023 European Centre for Medium-Range Weather Forecasts",
+  "licence": "CC-BY-4.0",
+  "terms-and-conditions": {
+   "href": "https://apps.ecmwf.int/datasets/licences/general/"
+  }
+ },
+ "template": "ecmwf",
+ "tracker": "tracker-f0ef657b12ac497e8a93a4191bd6a6d5",
+ "uid": ""
+}

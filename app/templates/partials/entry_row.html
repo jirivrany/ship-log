@@ -21,6 +21,15 @@
   </td>
 
   <td>
+    <input type="text" value="{{ entry.sails or '' }}"
+           list="sail-options" placeholder="Main + Genoa" class="input-sm"
+           hx-patch="/entries/{{ entry.id }}"
+           hx-trigger="blur"
+           hx-swap="none"
+           hx-vals='js:{"field": "sails", "value": event.target.value}'>
+  </td>
+
+  <td>
     <input type="text" value="{{ entry.wind_direction or '' }}"
            placeholder="NW" class="input-sm input-narrow"
            hx-patch="/entries/{{ entry.id }}"
