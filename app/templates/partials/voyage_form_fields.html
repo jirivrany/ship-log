@@ -1,19 +1,29 @@
 {# Shared voyage form fields — used by the create form (no `v`) and the
    edit form (`v` = existing Voyage, values pre-filled). #}
 {% set v = v | default(none) %}
+{% set current_area = (v.area.value if v and v.area else '') %}
 <h6 class="text-uppercase text-muted fw-semibold mb-3 border-bottom pb-2">Voyage</h6>
 <div class="row g-3 mb-3">
-  <div class="col-md-6">
+  <div class="col-md-4">
     <label class="form-label">Voyage name <span class="text-danger">*</span></label>
     <input type="text" class="form-control" name="name" placeholder="Chorvatsko 2026" value="{{ v.name or '' }}" required>
   </div>
-  <div class="col-md-3">
+  <div class="col-md-2">
     <label class="form-label">Start date</label>
     <input type="date" class="form-control" name="start_date" value="{{ v.start_date or '' }}">
   </div>
-  <div class="col-md-3">
+  <div class="col-md-2">
     <label class="form-label">End date</label>
     <input type="date" class="form-control" name="end_date" value="{{ v.end_date or '' }}">
+  </div>
+  <div class="col-md-4">
+    <label class="form-label">Navigation area</label>
+    <select class="form-select" name="area">
+      <option value="" {% if not current_area %}selected{% endif %}>—</option>
+      {% for code in area_order %}
+      <option value="{{ code }}" {% if current_area == code %}selected{% endif %}>{{ area_labels[code] }}</option>
+      {% endfor %}
+    </select>
   </div>
 </div>
 

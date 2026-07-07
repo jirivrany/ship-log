@@ -17,6 +17,26 @@ class TrackSource(str, Enum):
     strava = "strava"
 
 
+class NavArea(str, Enum):
+    """Navigation area for a whole voyage (CZ/EU skipper-licensing scheme)."""
+    area_a = "A"   # Ocean / Cat I — unrestricted
+    area_b = "B"   # Sea / Cat II — offshore ≤200 Nm
+    area_c = "C"   # Coastal / Cat III — ≤20 Nm
+    area_2 = "2"   # Inland/coastal waters ~2 Nm
+    area_1 = "1"   # Inland waterways
+
+
+# Display order (most open water first) and human labels for the summary/form.
+AREA_ORDER = ["A", "B", "C", "2", "1"]
+AREA_LABELS = {
+    "A": "Area A — Ocean",
+    "B": "Area B — Sea",
+    "C": "Area C — Coastal",
+    "2": "Area 2 — Inland/coastal",
+    "1": "Area 1 — Inland",
+}
+
+
 class EntrySource(str, Enum):
     turning_point = "turning_point"
     lap = "lap"
@@ -43,6 +63,7 @@ class Voyage(SQLModel, table=True):
     skipper: Optional[str] = None               # Kapitán
     was_skipper: bool = Field(default=False)    # the app user was the skipper
     crew: Optional[str] = None                  # crew names
+    area: Optional[NavArea] = None              # navigation area for the whole voyage
 
     # Boat technical specs (PDF: Hlavní údaje o plavidle)
     length_m: Optional[float] = None            # Délka (m)

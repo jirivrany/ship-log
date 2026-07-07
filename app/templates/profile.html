@@ -32,4 +32,46 @@
   {% include "partials/stats_tiles.html" %}
 </div>
 {% endif %}
+
+{% if area_rows %}
+{% macro area_cell(s) -%}
+  {%- if s.voyage_count > 0 -%}
+    <div class="fw-bold">{{ s.total_nm }} Nm</div>
+    <div class="text-muted small">{{ s.duration_hhmm }}</div>
+  {%- else -%}
+    <span class="text-muted">—</span>
+  {%- endif -%}
+{%- endmacro %}
+<h6 class="text-uppercase text-muted fw-semibold mb-2 border-bottom pb-2">By navigation area</h6>
+<div class="table-responsive mb-4">
+  <table class="table table-sm align-middle mb-0" style="max-width: 40rem;">
+    <thead>
+      <tr class="text-muted small text-uppercase">
+        <th>Area</th>
+        <th class="text-end">As skipper</th>
+        <th class="text-end">As crew</th>
+        <th class="text-end">Total</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in area_rows %}
+      <tr>
+        <td class="fw-medium">{{ row.label }}</td>
+        <td class="text-end">{{ area_cell(row.skipper) }}</td>
+        <td class="text-end">{{ area_cell(row.crew) }}</td>
+        <td class="text-end">{{ area_cell(row.total) }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+    <tfoot class="border-top">
+      <tr>
+        <td class="fw-semibold">Total</td>
+        <td class="text-end">{{ area_cell(skippered) }}</td>
+        <td class="text-end">{{ area_cell(as_crew) }}</td>
+        <td class="text-end">{{ area_cell(overall) }}</td>
+      </tr>
+    </tfoot>
+  </table>
+</div>
+{% endif %}
 {% endblock %}

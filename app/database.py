@@ -56,6 +56,10 @@ def migrate_schema(target_engine) -> None:
                     "ALTER TABLE voyage ADD COLUMN was_skipper BOOLEAN NOT NULL DEFAULT 0"
                 )
 
+            # 2026-07: navigation area (A/B/C/2/1) for per-area mile summary
+            if "area" not in voyage_cols:
+                conn.exec_driver_sql("ALTER TABLE voyage ADD COLUMN area VARCHAR")
+
         # 2026-07: weather enrichment — exact wind speed + provenance marker
         entry_cols = {row[1] for row in conn.exec_driver_sql("PRAGMA table_info(logentry)").fetchall()}
         if entry_cols:

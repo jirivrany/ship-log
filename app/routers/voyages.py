@@ -8,7 +8,7 @@ from sqlmodel import Session, select
 
 from app import boat_library
 from app.database import get_session
-from app.models import Leg, LogEntry, Voyage
+from app.models import Leg, LogEntry, NavArea, Voyage
 from app.processors import loader
 from app.stats import compute_stats
 from app.templates_env import templates
@@ -52,6 +52,9 @@ def _apply_voyage_form(voyage: Voyage, form) -> Optional[str]:
         setattr(voyage, field, int(value) if value else None)
     # checkboxes are absent from the POST body when unchecked
     voyage.was_skipper = form.get("was_skipper") is not None
+    # navigation area: keep only a valid code, else clear it
+    area = (form.get("area") or "").strip()
+    voyage.area = NavArea(area) if area in NavArea._value2member_map_ else None
     return None
 
 
