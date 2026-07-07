@@ -5,7 +5,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from app.database import init_db
-from app.routers import voyages, legs, log_entries
+from app.routers import voyages, legs, log_entries, profile, strava
 
 
 @asynccontextmanager
@@ -22,3 +22,5 @@ app.mount("/static", StaticFiles(directory="app/static"), name="static")
 app.include_router(voyages.router)
 app.include_router(legs.router)
 app.include_router(log_entries.router)
+app.include_router(profile.router)
+app.include_router(strava.router)

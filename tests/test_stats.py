@@ -1,7 +1,9 @@
 from datetime import datetime, timezone
 
+import pytest
+
 from app.models import EntrySource, LogEntry, PropulsionType
-from app.stats import _format_hhmm, compute_stats
+from app.stats import _format_hhmm, aggregate_stats, compute_stats
 
 
 def _entry(leg_id=1, minutes_offset=0, log_value=None, propulsion="motor", source=EntrySource.manual):
@@ -116,3 +118,81 @@ def test_dist_le_zero_skipped():
     s = compute_stats(entries)
     assert s["motor_nm"] == 0.0
     assert s["total_nm"] == 0.0
+
+
+# --- raw values ---
+
+def test_raw_values_unrounded_and_consistent():
+    entries = [
+        _entry(minutes_offset=0,  log_value=0.0,   propulsion="sail"),
+        _entry(minutes_offset=45, log_value=5.55,  propulsion="motor"),
+        _entry(minutes_offset=90, log_value=10.11, propulsion="motor"),
+    ]
+    s = compute_stats(entries)
+    assert s["raw"]["sail_nm"] == 5.55           # unrounded
+    assert s["raw"]["motor_nm"] == pytest.approx(10.11 - 5.55)
+    assert s["raw"]["total_nm"] == pytest.approx(10.11)
+    assert s["sail_nm"] == round(s["raw"]["sail_nm"], 1)
+    assert s["raw"]["sail_min"] == 45.0
+    assert s["raw"]["motor_min"] == 45.0
+    assert s["raw"]["duration_min"] == 90.0      # wall clock
+
+
+def test_raw_anchor_minutes_exposed():
+    # anchor has no formatted _hhmm key, but raw minutes must not be dropped
+    entries = [
+        _entry(minutes_offset=0,  log_value=0.0, propulsion="anchor"),
+        _entry(minutes_offset=30, log_value=0.5, propulsion="motor"),
+    ]
+    s = compute_stats(entries)
+    assert s["raw"]["anchor_nm"] == 0.5
+    assert s["raw"]["anchor_min"] == 30.0
+
+
+# --- aggregate_stats ---
+
+def test_aggregate_stats_sums_raw_then_formats():
+    v1 = compute_stats([
+        _entry(minutes_offset=0,  log_value=0.0,  propulsion="sail"),
+        _entry(minutes_offset=90, log_value=10.25, propulsion="sail"),
+    ])
+    v2 = compute_stats([
+        _entry(minutes_offset=0,  log_value=0.0,  propulsion="motor"),
+        _entry(minutes_offset=60, log_value=5.25, propulsion="sail"),
+        _entry(minutes_offset=90, log_value=8.25, propulsion="sail"),
+    ])
+    agg = aggregate_stats([v1, v2])
+    assert agg["sail_nm"] == round(10.25 + 3.0, 1)
+    assert agg["motor_nm"] == 5.2  # 5.25 rounded after summation
+    assert agg["total_nm"] == round(10.25 + 8.25, 1)
+    assert agg["sail_hhmm"] == "2:00"       # 90 + 30 sail minutes
+    assert agg["motor_hhmm"] == "1:00"
+    assert agg["duration_hhmm"] == "3:00"   # sum of per-voyage wall clocks
+    assert agg["voyage_count"] == 2
+
+
+def test_aggregate_stats_rounds_after_summing():
+    # two voyages of 0.25 Nm: rounding each first would give 0.2+0.2=0.4
+    stats = compute_stats([
+        _entry(minutes_offset=0,  log_value=0.0,  propulsion="motor"),
+        _entry(minutes_offset=30, log_value=0.25, propulsion="motor"),
+    ])
+    agg = aggregate_stats([stats, stats])
+    assert agg["total_nm"] == 0.5
+
+
+def test_aggregate_stats_empty():
+    agg = aggregate_stats([])
+    assert agg["total_nm"] == 0.0
+    assert agg["duration_hhmm"] == "0:00"
+    assert agg["voyage_count"] == 0
+
+
+def test_aggregate_stats_includes_empty_voyage():
+    stats = compute_stats([
+        _entry(minutes_offset=0,  log_value=0.0, propulsion="sail"),
+        _entry(minutes_offset=60, log_value=6.0, propulsion="sail"),
+    ])
+    agg = aggregate_stats([stats, compute_stats([])])
+    assert agg["total_nm"] == 6.0
+    assert agg["voyage_count"] == 2

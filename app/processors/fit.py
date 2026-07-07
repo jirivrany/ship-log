@@ -1,31 +1,13 @@
 import re
-from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Optional
 
 import fitparse
-from timezonefinder import TimezoneFinder
 
-_tf = TimezoneFinder()
+from app.processors.track import LapPoint, TrackMeta
+from app.processors.tz import tz_name_at
 
 SEMICIRCLE_TO_DEG = 180.0 / (2**31)
-
-
-@dataclass
-class LapPoint:
-    timestamp: datetime
-    lat: float
-    lon: float
-
-
-@dataclass
-class FitMeta:
-    date: str                    # YYYY-MM-DD
-    from_port: Optional[str]
-    to_port: Optional[str]
-    total_distance_nm: Optional[float]
-    start_time: Optional[datetime]
-    timezone: str                # IANA name e.g. "Europe/Zagreb"
 
 
 def _sc(value: int) -> float:
@@ -36,7 +18,7 @@ def _ensure_utc(dt: datetime) -> datetime:
     return dt.replace(tzinfo=timezone.utc) if dt.tzinfo is None else dt
 
 
-def parse_fit_metadata(path: str, filename: str) -> FitMeta:
+def parse_fit_metadata(path: str, filename: str) -> TrackMeta:
     """Extract date, ports, total distance and timezone from FIT file + filename."""
     date, from_port, to_port = _parse_filename(filename)
 
@@ -63,11 +45,7 @@ def parse_fit_metadata(path: str, filename: str) -> FitMeta:
         lat_sc = fields.get("start_position_lat")
         lon_sc = fields.get("start_position_long")
         if lat_sc is not None and lon_sc is not None:
-            lat = _sc(lat_sc)
-            lon = _sc(lon_sc)
-            found = _tf.timezone_at(lat=lat, lng=lon)
-            if found:
-                tz_name = found
+            tz_name = tz_name_at(_sc(lat_sc), _sc(lon_sc))
         break  # single session per file
 
     # Fallback: use first record position if session had no position
@@ -77,9 +55,7 @@ def parse_fit_metadata(path: str, filename: str) -> FitMeta:
             lat_sc = fields.get("position_lat")
             lon_sc = fields.get("position_long")
             if lat_sc is not None and lon_sc is not None:
-                found = _tf.timezone_at(lat=_sc(lat_sc), lng=_sc(lon_sc))
-                if found:
-                    tz_name = found
+                tz_name = tz_name_at(_sc(lat_sc), _sc(lon_sc))
                 break
 
     # Re-derive date in local timezone so a leg starting at e.g. 23:30 UTC
@@ -88,7 +64,7 @@ def parse_fit_metadata(path: str, filename: str) -> FitMeta:
         from zoneinfo import ZoneInfo
         date = start_time.astimezone(ZoneInfo(tz_name)).strftime("%Y-%m-%d")
 
-    return FitMeta(
+    return TrackMeta(
         date=date or "",
         from_port=from_port,
         to_port=to_port,

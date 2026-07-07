@@ -2,8 +2,7 @@ from datetime import datetime
 from typing import Optional
 
 from app.models import EntrySource, LogEntry
-from app.processors.fit_track import ProcessedTrack, TrackPoint
-from app.processors.fit import LapPoint
+from app.processors.track import LapPoint, ProcessedTrack, TrackPoint
 
 
 def _nearest_track_point(ts: datetime, track: list[TrackPoint]) -> Optional[TrackPoint]:

@@ -19,6 +19,10 @@ FIELD_SETTERS = {
     "notes":                lambda e, v: setattr(e, "notes", v or None),
 }
 
+# Editing any of these by hand turns the entry back into a skipper observation.
+WEATHER_FIELDS = {"wind_direction", "wind_force", "sea_state",
+                  "atmospheric_pressure", "air_temperature"}
+
 
 @router.patch("/entries/{entry_id}", response_class=HTMLResponse)
 def patch_entry(
@@ -37,6 +41,8 @@ def patch_entry(
     if setter:
         try:
             setter(entry, value.strip())
+            if field in WEATHER_FIELDS:
+                entry.weather_source = None
         except (ValueError, KeyError):
             pass  # invalid value — ignore, keep existing
 

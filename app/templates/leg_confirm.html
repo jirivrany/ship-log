@@ -2,15 +2,23 @@
 {% block title %}Confirm Leg — {{ voyage.name }}{% endblock %}
 
 {% block content %}
+{% if attach_leg %}
+<a href="/legs/{{ attach_leg.id }}" class="text-muted small text-decoration-none">← {{ attach_leg.from_port }} → {{ attach_leg.to_port }}</a>
+{% else %}
 <a href="/voyages/{{ voyage.id }}" class="text-muted small text-decoration-none">← {{ voyage.name }}</a>
+{% endif %}
 <h1 class="h3 mt-1 mb-1">Confirm Leg Details</h1>
-<p class="text-muted mb-4">Parsed from <code>{{ fit_filename }}</code> — edit if needed</p>
+<p class="text-muted mb-4">Parsed from <code>{{ track_filename }}</code> — edit if needed</p>
 
 <div class="card p-4">
-  <form action="/voyages/{{ voyage.id }}/legs" method="post">
-    <input type="hidden" name="fit_path" value="{{ fit_path }}">
-    <input type="hidden" name="timezone" value="{{ meta.timezone }}">
+  <form action="{% if attach_leg %}/legs/{{ attach_leg.id }}/attach-track{% else %}/voyages/{{ voyage.id }}/legs{% endif %}" method="post">
+    <input type="hidden" name="track_path" value="{{ track_path }}">
+    {% if strava_activity_id %}
+    <input type="hidden" name="strava_activity_id" value="{{ strava_activity_id }}">
+    {% endif %}
 
+    {% if not attach_leg %}
+    <input type="hidden" name="timezone" value="{{ meta.timezone }}">
     <h6 class="text-uppercase text-muted fw-semibold border-bottom pb-2 mb-3">Route</h6>
     <div class="row g-3 mb-3">
       <div class="col-md-3">
@@ -26,6 +34,7 @@
         <input type="text" class="form-control form-control-sm" name="to_port" value="{{ meta.to_port or '' }}" placeholder="e.g. Ždrelac" required>
       </div>
     </div>
+    {% endif %}
 
     {% if meta.total_distance_nm or meta.start_time %}
     <div class="d-flex gap-4 px-3 py-2 mb-4 rounded" style="background:#f0f9ff;border:1px solid #bae6fd;font-size:13px;">
@@ -36,6 +45,14 @@
       <span class="text-muted">Total distance: <strong class="text-dark">{{ meta.total_distance_nm }} Nm</strong></span>
       {% endif %}
       <span class="text-muted">Timezone: <strong class="text-dark">{{ meta.timezone }}</strong></span>
+    </div>
+    {% endif %}
+
+    {% if meta.description %}
+    <h6 class="text-uppercase text-muted fw-semibold border-bottom pb-2 mb-3">Leg summary</h6>
+    <div class="mb-4">
+      <label class="form-label">Imported from Strava — added as a note at arrival</label>
+      <textarea class="form-control form-control-sm" name="description" rows="3">{{ meta.description }}</textarea>
     </div>
     {% endif %}
 
@@ -62,7 +79,7 @@
 
     <div class="d-flex gap-2">
       <button type="submit" class="btn btn-primary">Confirm &amp; Process</button>
-      <a href="/voyages/{{ voyage.id }}/legs/new" class="btn btn-secondary">Back</a>
+      <a href="{% if back_url %}{{ back_url }}{% elif attach_leg %}/legs/{{ attach_leg.id }}/attach-track{% else %}/voyages/{{ voyage.id }}/legs/new{% endif %}" class="btn btn-secondary">Back</a>
     </div>
   </form>
 </div>

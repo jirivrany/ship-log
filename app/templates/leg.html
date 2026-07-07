@@ -18,7 +18,61 @@
          hx-swap="none"
          hx-vals='js:{"field": "to_port", "value": event.target.value}'>
 </h1>
-<p class="text-muted mb-4">{{ leg.date }}</p>
+<div class="d-flex align-items-center gap-3 mb-4 flex-wrap">
+  <p class="text-muted mb-0">{{ leg.date }}</p>
+  <a href="/legs/{{ leg.id }}/quick-note" class="btn btn-outline-primary btn-sm">+ Quick Note</a>
+  {% if not leg.track_path %}
+  <a href="/legs/{{ leg.id }}/attach-track" class="btn btn-outline-primary btn-sm">Attach track file</a>
+  {% endif %}
+  {% if local_entries %}
+  <form method="post" action="/legs/{{ leg.id }}/fetch-weather" class="d-flex align-items-center gap-2 mb-0">
+    <button type="submit" class="btn btn-outline-primary btn-sm">⛅ Fetch weather</button>
+    <label class="small text-muted d-flex align-items-center gap-1 mb-0">
+      <input type="checkbox" name="overwrite" class="form-check-input mt-0"> overwrite existing
+    </label>
+  </form>
+  {% endif %}
+  {% if weather_msg %}<span class="small text-success">{{ weather_msg }}</span>{% endif %}
+</div>
+
+{% if local_entries %}
+<div class="card p-3 mb-4">
+  <h2 class="h6 fw-semibold mb-3">Summary</h2>
+  <div id="leg-summary"
+       hx-get="/legs/{{ leg.id }}/summary"
+       hx-trigger="propulsionChanged from:body">
+    {% include "partials/leg_summary.html" %}
+  </div>
+</div>
+{% endif %}
+
+<div class="mb-4">
+  <h2 class="h5 mb-2">Notes</h2>
+  {% if local_notes %}
+  <div class="table-responsive border rounded">
+    <table class="table table-sm table-hover mb-0">
+      <thead class="table-light">
+        <tr>
+          <th style="width:1%">Time</th>
+          <th style="width:1%">Position</th>
+          <th>Note</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for entry, local_time in local_notes %}
+        <tr>
+          <td class="text-nowrap">{{ local_time }}</td>
+          <td class="text-nowrap">{% if entry.lat is not none and entry.lon is not none %}{{ "%.4f"|format(entry.lat) }}, {{ "%.4f"|format(entry.lon) }}{% else %}—{% endif %}</td>
+          <td style="white-space:normal">{{ entry.notes }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="text-muted small">No notes yet — use "Quick Note" above, or add a note on any log entry below.</p>
+  {% endif %}
+</div>
 
 <div id="map"></div>
 
@@ -53,17 +107,6 @@
     </tbody>
   </table>
 </div>
-
-{% if local_entries %}
-<div class="card p-3 mt-4">
-  <h2 class="h6 fw-semibold mb-3">Summary</h2>
-  <div id="leg-summary"
-       hx-get="/legs/{{ leg.id }}/summary"
-       hx-trigger="propulsionChanged from:body">
-    {% include "partials/leg_summary.html" %}
-  </div>
-</div>
-{% endif %}
 {% endblock %}
 
 {% block scripts %}
@@ -72,13 +115,20 @@
   const logEntries = [
     {% for entry, local_time in local_entries %}
     {
-      lat: {{ entry.lat }},
-      lon: {{ entry.lon }},
+      lat: {{ entry.lat | tojson }},
+      lon: {{ entry.lon | tojson }},
       source: "{{ entry.source.value }}",
       id: {{ entry.id }},
       time: "{{ local_time }}",
       cog: {{ entry.course | int if entry.course else 'null' }},
       sog: {{ "%.1f"|format(entry.speed) if entry.speed else 'null' }},
+      windDir: {{ entry.wind_direction | tojson }},
+      windBf: {{ entry.wind_force | tojson }},
+      windKn: {{ entry.wind_speed_kn | tojson }},
+      temp: {{ entry.air_temperature | tojson }},
+      pressure: {{ entry.atmospheric_pressure | tojson }},
+      oktas: {{ entry.cloud_cover | tojson }},
+      sea: {{ entry.sea_state | tojson }},
     },
     {% endfor %}
   ];
@@ -90,9 +140,9 @@
   }).addTo(map);
 
   const latLons = trackPoints.map(p => [p.lat, p.lon]);
+  let polyline = null;
   if (latLons.length > 0) {
-    const polyline = L.polyline(latLons, { color: '#2563eb', weight: 4, opacity: 0.8 }).addTo(map);
-    map.fitBounds(polyline.getBounds(), { padding: [20, 20] });
+    polyline = L.polyline(latLons, { color: '#2563eb', weight: 4, opacity: 0.8 }).addTo(map);
 
     polyline.on('click', function(ev) {
       L.DomEvent.stopPropagation(ev);
@@ -122,6 +172,18 @@
         )
         .openOn(map);
     });
+  }
+
+  // Fit the map to whatever positioned data exists: the FIT track if present,
+  // otherwise any log entries (e.g. quick notes) that have a resolved position.
+  const positionedEntryLatLons = logEntries
+    .filter(e => e.lat !== null && e.lon !== null)
+    .map(e => [e.lat, e.lon]);
+  const boundsLatLons = latLons.length > 0 ? latLons : positionedEntryLatLons;
+  if (boundsLatLons.length > 0) {
+    map.fitBounds(L.latLngBounds(boundsLatLons), { padding: [20, 20] });
+  } else {
+    map.setView([43.5, 16.0], 8);  // default view: Adriatic, this app's usual cruising ground
   }
 
   function addEntry(btn) {
@@ -179,11 +241,31 @@
     lap: '#7c3aed',
     hourly: '#059669',
     manual: '#d97706',
+    quick_note: '#0891b2',
   };
 
   const markerRegistry = {};  // entry id → Leaflet marker
 
+  const skyLabels = ['clear', 'clear', 'partly cloudy', 'partly cloudy', 'partly cloudy',
+                     'mostly cloudy', 'mostly cloudy', 'mostly cloudy', 'overcast'];
+
+  function weatherLines(e) {
+    const lines = [];
+    if (e.windDir != null || e.windBf != null) {
+      const kn = e.windKn != null ? ` (${e.windKn} kn)` : '';
+      lines.push(`Wind ${e.windDir ?? ''} ${e.windBf != null ? e.windBf + ' Bf' : ''}${kn}`.replace(/\s+/g, ' ').trim());
+    }
+    const bits = [];
+    if (e.temp != null) bits.push(`${e.temp} °C`);
+    if (e.pressure != null) bits.push(`${e.pressure} hPa`);
+    if (e.oktas != null) bits.push(`${skyLabels[e.oktas] ?? ''} ${e.oktas}/8`);
+    if (e.sea != null) bits.push(`sea ${e.sea}`);
+    if (bits.length) lines.push(bits.join(' &nbsp; '));
+    return lines.length ? lines.join('<br>') + '<br>' : '';
+  }
+
   function addMarker(e) {
+    if (e.lat === null || e.lon === null) return;
     const color = sourceColors[e.source] || '#6b7280';
     const marker = L.circleMarker([e.lat, e.lon], {
       radius: e.source === 'lap' ? 8 : 6,
@@ -199,6 +281,7 @@
     marker.bindPopup(
       `<strong>${e.time}</strong> <span class="popup-source">${e.source.replace('_', ' ')}</span><br>` +
       `COG ${cogStr} &nbsp; SOG ${sogStr}<br>` +
+      weatherLines(e) +
       `<button onclick="deleteEntry(${e.id})" class="popup-delete-btn">Delete entry</button>`
     );
     marker.on('contextmenu', ev => { L.DomEvent.preventDefault(ev); marker.openPopup(); });

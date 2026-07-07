@@ -12,99 +12,7 @@
 <div class="collapse mb-4" id="new-voyage-form">
   <div class="card card-body">
     <form action="/voyages" method="post">
-
-      <h6 class="text-uppercase text-muted fw-semibold mb-3 border-bottom pb-2">Voyage</h6>
-      <div class="row g-3 mb-3">
-        <div class="col-md-6">
-          <label class="form-label">Voyage name <span class="text-danger">*</span></label>
-          <input type="text" class="form-control" name="name" placeholder="Chorvatsko 2026" required>
-        </div>
-      </div>
-
-      <h6 class="text-uppercase text-muted fw-semibold mb-3 border-bottom pb-2">Boat identification</h6>
-      <div class="row g-3 mb-3">
-        <div class="col-md-4">
-          <label class="form-label">Boat name / type <span class="text-danger">*</span></label>
-          <input type="text" class="form-control" name="boat" placeholder="Bavaria Cruiser 34" required>
-        </div>
-        <div class="col-md-4">
-          <label class="form-label">Registration number</label>
-          <input type="text" class="form-control" name="registration_number">
-        </div>
-        <div class="col-md-4">
-          <label class="form-label">Home port</label>
-          <input type="text" class="form-control" name="home_port">
-        </div>
-        <div class="col-md-4">
-          <label class="form-label">Call sign</label>
-          <input type="text" class="form-control" name="call_sign">
-        </div>
-        <div class="col-md-4">
-          <label class="form-label">Owner</label>
-          <input type="text" class="form-control" name="owner">
-        </div>
-        <div class="col-md-4">
-          <label class="form-label">Crew</label>
-          <input type="text" class="form-control" name="crew" placeholder="Names">
-        </div>
-      </div>
-
-      <h6 class="text-uppercase text-muted fw-semibold mb-3 border-bottom pb-2">Boat specifications</h6>
-      <div class="row g-3 mb-3">
-        <div class="col-6 col-md-3">
-          <label class="form-label">Length (m)</label>
-          <input type="number" class="form-control" name="length_m" step="0.01">
-        </div>
-        <div class="col-6 col-md-3">
-          <label class="form-label">Beam (m)</label>
-          <input type="number" class="form-control" name="beam_m" step="0.01">
-        </div>
-        <div class="col-6 col-md-3">
-          <label class="form-label">Draft (m)</label>
-          <input type="number" class="form-control" name="draft_m" step="0.01">
-        </div>
-        <div class="col-6 col-md-3">
-          <label class="form-label">Air draft (m)</label>
-          <input type="number" class="form-control" name="air_draft_m" step="0.01">
-        </div>
-        <div class="col-6 col-md-3">
-          <label class="form-label">Engine type</label>
-          <input type="text" class="form-control" name="engine_type">
-        </div>
-        <div class="col-6 col-md-3">
-          <label class="form-label">Engine power (kW)</label>
-          <input type="number" class="form-control" name="engine_power_kw" step="0.1">
-        </div>
-        <div class="col-6 col-md-3">
-          <label class="form-label">Displacement (t)</label>
-          <input type="number" class="form-control" name="displacement_t" step="0.01">
-        </div>
-        <div class="col-6 col-md-3">
-          <label class="form-label">Max persons</label>
-          <input type="number" class="form-control" name="max_persons" min="1">
-        </div>
-        <div class="col-6 col-md-3">
-          <label class="form-label">Total sail area (m²)</label>
-          <input type="number" class="form-control" name="sail_area_m2" step="0.1">
-        </div>
-        <div class="col-6 col-md-3">
-          <label class="form-label">Mainsail (m²)</label>
-          <input type="number" class="form-control" name="mainsail_m2" step="0.1">
-        </div>
-        <div class="col-6 col-md-3">
-          <label class="form-label">Genoa (m²)</label>
-          <input type="number" class="form-control" name="genoa_m2" step="0.1">
-        </div>
-        <div class="col-6 col-md-3">
-          <label class="form-label">Water tank (l)</label>
-          <input type="number" class="form-control" name="water_tank_l">
-        </div>
-        <div class="col-6 col-md-3">
-          <label class="form-label">Fuel tank (l)</label>
-          <input type="number" class="form-control" name="fuel_tank_l">
-        </div>
-      </div>
-
+      {% include "partials/voyage_form_fields.html" %}
       <div class="d-flex gap-2">
         <button type="submit" class="btn btn-primary">Create Voyage</button>
         <button type="button" class="btn btn-secondary" data-bs-toggle="collapse" data-bs-target="#new-voyage-form">Cancel</button>
@@ -119,8 +27,14 @@
   <a href="/voyages/{{ voyage.id }}" class="card card-body text-decoration-none text-dark voyage-card">
     <div class="fw-semibold">{{ voyage.name }}</div>
     <div class="text-muted small">
-      {{ voyage.boat }}
+      {% if voyage.start_date and voyage.end_date %}
+        {{ voyage.start_date | datetimeformat("%-d.%-m.") }}–{{ voyage.end_date | datetimeformat("%-d.%-m.%Y") }} ·
+      {% elif voyage.start_date %}
+        {{ voyage.start_date | datetimeformat("%-d.%-m.%Y") }} ·
+      {% endif %}
+      {{ voyage.boat_label }}
       {% if voyage.registration_number %} · {{ voyage.registration_number }}{% endif %}
+      {% if voyage.skipper %} · Skipper: {{ voyage.skipper }}{% endif %}
       {% if voyage.crew %} · {{ voyage.crew }}{% endif %}
       · {{ voyage.legs | length }} leg{{ 's' if voyage.legs | length != 1 }}
     </div>
@@ -132,6 +46,3 @@
 {% endif %}
 {% endblock %}
 
-{% block scripts %}
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-{% endblock %}
