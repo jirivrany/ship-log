@@ -65,28 +65,30 @@ def _voyage_window(voyage: Voyage) -> tuple[int | None, int | None]:
     return after, before
 
 
-def _activity_rows(session: Session, voyage: Voyage) -> list[dict]:
+def _activity_rows(session: Session, voyage: Voyage) -> tuple[list[dict], dict]:
+    """Picker rows plus a scan summary used to explain an empty result."""
     after, before = _voyage_window(voyage)
-    activities = strava_api.fetch_sail_activities(after=after, before=before)
-    ids = [a["id"] for a in activities]
+    result = strava_api.fetch_sail_activities(after=after, before=before)
+    ids = [a["id"] for a in result.activities]
     imported: dict[int, Leg] = {}
     if ids:
         legs = session.exec(select(Leg).where(Leg.strava_activity_id.in_(ids))).all()
         imported = {leg.strava_activity_id: leg for leg in legs}
-    return [{
+    rows = [{
         "id": a["id"],
         "name": a.get("name", ""),
         "date": (a.get("start_date_local") or a.get("start_date") or "")[:10],
         "distance_nm": round(a.get("distance", 0) / 1852.0, 1),
         "imported_leg": imported.get(a["id"]),
-    } for a in activities]
+    } for a in result.activities]
+    return rows, {"scanned": result.scanned, "truncated": result.truncated}
 
 
 def _render_picker(request: Request, session: Session, *, voyage: Voyage,
                    post_base: str, back_url: str, self_url: str,
                    attach_leg: Leg = None):
     try:
-        rows = _activity_rows(session, voyage)
+        rows, scan = _activity_rows(session, voyage)
     except strava_api.StravaNotAuthorized:
         return RedirectResponse(f"/strava/authorize?next={self_url}")
     except strava_api.StravaConfigError as e:
@@ -97,6 +99,7 @@ def _render_picker(request: Request, session: Session, *, voyage: Voyage,
         "voyage": voyage,
         "attach_leg": attach_leg,
         "rows": rows,
+        "scan": scan,
         "post_base": post_base,
         "back_url": back_url,
     })

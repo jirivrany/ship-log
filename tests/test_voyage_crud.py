@@ -213,3 +213,25 @@ def test_delete_cascades_rows_and_files(client, voyage, db_session):
 def test_delete_missing_voyage_is_noop(client):
     r = client.delete("/voyages/999")
     assert r.status_code == 200
+
+
+def test_new_voyage_form_end_date_is_prefillable(client):
+    """Create form: end date starts empty and unmarked, so picking a start
+    date lets the +7-day prefill fire."""
+    html = client.get("/").text
+    assert 'oninput="prefillEndDate(this)"' in html
+    assert 'name="end_date"' in html
+    assert 'data-touched' not in html
+
+
+def test_edit_form_marks_existing_end_date_as_touched(client, voyage, db_session):
+    """Edit form: a saved end date is pre-marked touched so changing the
+    start date can never silently overwrite it."""
+    voyage.start_date = "2025-10-04"
+    voyage.end_date = "2025-10-11"
+    db_session.add(voyage)
+    db_session.commit()
+
+    html = client.get(f"/voyages/{voyage.id}/edit").text
+    assert 'data-touched="1"' in html
+    assert 'min="2025-10-04"' in html

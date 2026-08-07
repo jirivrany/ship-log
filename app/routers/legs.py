@@ -42,6 +42,7 @@ def _generate_gps_entries(
     default_propulsion: str,
     default_wind_direction: Optional[str],
     default_wind_force: Optional[str],
+    default_sails: Optional[str] = None,
     description: Optional[str] = None,
 ) -> list[LogEntry]:
     """Parse a track file (FIT or GPX) and build the GPS-derived LogEntry rows
@@ -57,10 +58,17 @@ def _generate_gps_entries(
     prefill_propulsion = PropulsionType(default_propulsion)
     prefill_wind_dir = default_wind_direction.strip() or None if default_wind_direction else None
     prefill_wind_force = int(default_wind_force) if default_wind_force and default_wind_force.strip() else None
+    # Sails only describe an entry that carries canvas — a motor/anchor prefill
+    # never gets a sail configuration, whatever the form happened to submit.
+    prefill_sails = (default_sails.strip() or None) if default_sails else None
+    if prefill_propulsion not in (PropulsionType.sail, PropulsionType.both):
+        prefill_sails = None
 
     entries = build_log_entries(leg_id, track, laps)
     for entry in entries:
         entry.propulsion = prefill_propulsion
+        if prefill_sails:
+            entry.sails = prefill_sails
         if prefill_wind_dir:
             entry.wind_direction = prefill_wind_dir
         if prefill_wind_force is not None:
@@ -169,6 +177,7 @@ async def create_leg(
     description: Optional[str] = Form(None),
     # prefill defaults applied to all generated entries
     default_propulsion: str = Form("motor"),
+    default_sails: Optional[str] = Form(None),
     default_wind_direction: Optional[str] = Form(None),
     default_wind_force: Optional[str] = Form(None),
     session: Session = Depends(get_session),
@@ -211,7 +220,7 @@ async def create_leg(
 
     entries = _generate_gps_entries(
         leg.id, final_path, default_propulsion, default_wind_direction, default_wind_force,
-        description=description,
+        default_sails=default_sails, description=description,
     )
     for entry in entries:
         session.add(entry)
@@ -269,6 +278,7 @@ async def attach_track(
     strava_activity_id: Optional[int] = Form(None),
     description: Optional[str] = Form(None),
     default_propulsion: str = Form("motor"),
+    default_sails: Optional[str] = Form(None),
     default_wind_direction: Optional[str] = Form(None),
     default_wind_force: Optional[str] = Form(None),
     session: Session = Depends(get_session),
@@ -305,7 +315,7 @@ async def attach_track(
 
     entries = _generate_gps_entries(
         leg.id, final_path, default_propulsion, default_wind_direction, default_wind_force,
-        description=description,
+        default_sails=default_sails, description=description,
     )
     for entry in entries:
         session.add(entry)

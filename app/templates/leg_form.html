@@ -22,7 +22,7 @@
     {% endif %}
     <div class="d-flex gap-2">
       <button type="submit" class="btn btn-primary">Upload &amp; Preview</button>
-      <a href="{% if attach_leg %}/legs/{{ attach_leg.id }}{% else %}/voyages/{{ voyage.id }}{% endif %}" class="btn btn-secondary">Cancel</a>
+      <a href="{% if attach_leg %}/legs/{{ attach_leg.id }}{% else %}/voyages/{{ voyage.id }}{% endif %}" class="btn btn-light border">Cancel</a>
     </div>
   </form>
 </div>

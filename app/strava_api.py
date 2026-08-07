@@ -10,7 +10,7 @@ No webhooks, no background sync: every call here is user-initiated.
 import json
 import os
 import time
-from typing import Optional
+from typing import NamedTuple, Optional
 
 import httpx
 
@@ -24,6 +24,12 @@ STREAM_KEYS = "time,latlng,velocity_smooth,distance,temp"
 # Refresh slightly before the 6-hour expiry to avoid using a token that
 # dies mid-import.
 EXPIRY_MARGIN_S = 60
+
+# Ceiling on the activity-list walk (~500 activities at the default page
+# size). Strava has no server-side sport filter, so a wide window can hide
+# sailing behind pages of other sports; the cap keeps that walk bounded
+# against the API's rate limits.
+MAX_PAGES = 10
 
 
 class StravaConfigError(Exception):
@@ -151,21 +157,49 @@ def _api_get(path: str, params: Optional[dict] = None,
     return r.json()
 
 
+class SailActivities(NamedTuple):
+    """Sail activities plus what it took to find them.
+
+    `scanned` (activities of every sport inspected) and `truncated` (the
+    page cap stopped the walk early) let the picker explain an empty
+    result instead of just showing nothing."""
+    activities: list[dict]
+    scanned: int
+    truncated: bool
+
+
 def fetch_sail_activities(per_page: int = 50,
                           after: Optional[int] = None,
                           before: Optional[int] = None,
-                          http: Optional[httpx.Client] = None) -> list[dict]:
-    """One page of the athlete's timeline, filtered client-side to sailing.
+                          http: Optional[httpx.Client] = None) -> SailActivities:
+    """The athlete's timeline within a window, filtered client-side to sailing.
+
+    Strava has no server-side sport filter, so sailing activities can sit
+    behind any number of pages of other sports — walk pages until the
+    timeline runs out (a short page) or MAX_PAGES trips, whichever first.
 
     after/before are epoch seconds (Strava's own filter params) — used to
     reach past activities, e.g. a voyage window from years back."""
-    params: dict = {"per_page": per_page}
+    base: dict = {"per_page": per_page}
     if after is not None:
-        params["after"] = after
+        base["after"] = after
     if before is not None:
-        params["before"] = before
-    activities = _api_get("/athlete/activities", params, http=http)
-    return [a for a in activities if a.get("sport_type") == "Sail"]
+        base["before"] = before
+
+    sail: list[dict] = []
+    scanned = 0
+    truncated = False
+    for page in range(1, MAX_PAGES + 1):
+        activities = _api_get("/athlete/activities", {**base, "page": page},
+                              http=http)
+        scanned += len(activities)
+        sail.extend(a for a in activities if a.get("sport_type") == "Sail")
+        if len(activities) < per_page:
+            break  # short page — the timeline is exhausted
+    else:
+        # Ran the full range without a short page; more may remain.
+        truncated = True
+    return SailActivities(sail, scanned, truncated)
 
 
 def fetch_activity_bundle(activity_id: int,

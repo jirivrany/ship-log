@@ -90,9 +90,8 @@
 
 {# ---------- one day page per leg ---------- #}
 {% for c in legs %}
-  {% with leg=c.leg, local_entries=c.local_entries, local_notes=c.local_notes,
-          stats=c.stats, weather=c.weather,
-          track_map_uri=c.track_map_uri, synoptic_chart_uri=c.synoptic_chart_uri %}
+  {% with leg=c.leg, local_entries=c.local_entries, stats=c.stats,
+          weather=c.weather, synoptic_chart_uri=c.synoptic_chart_uri %}
     {% include "print/day_page.html" %}
   {% endwith %}
 {% endfor %}

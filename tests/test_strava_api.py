@@ -120,7 +120,8 @@ def test_fetch_sail_activities_filters_and_authenticates(strava_env):
         ])
 
     result = strava_api.fetch_sail_activities(http=_client(handler))
-    assert [a["id"] for a in result] == [1, 3]
+    assert [a["id"] for a in result.activities] == [1, 3]
+    assert result.scanned == 3
 
 
 def test_fetch_activities_passes_window_params(strava_env):
@@ -144,6 +145,93 @@ def test_fetch_activities_omits_unset_window(strava_env):
         return httpx.Response(200, json=[])
 
     strava_api.fetch_sail_activities(http=_client(handler))
+
+
+# --- pagination ---
+
+def _paging_handler(pages, seen=None):
+    """Serve `pages` (list of activity lists) by requested page number."""
+    def handler(request):
+        page = int(request.url.params.get("page", 1))
+        if seen is not None:
+            seen.append(page)
+        body = pages[page - 1] if page <= len(pages) else []
+        return httpx.Response(200, json=body)
+    return handler
+
+
+def _acts(start_id, count, sport="Ride"):
+    return [{"id": start_id + i, "sport_type": sport, "name": f"a{start_id + i}"}
+            for i in range(count)]
+
+
+def test_sail_activities_found_beyond_first_page(strava_env):
+    """The original bug: a full page of non-sailing activities hid the sail
+    ones that sat on later pages."""
+    _write_tokens(strava_env)
+    pages = [
+        _acts(1, 50, "Ride"),
+        _acts(51, 50, "Run"),
+        _acts(101, 3, "Sail"),
+    ]
+    result = strava_api.fetch_sail_activities(per_page=50,
+                                              http=_client(_paging_handler(pages)))
+    assert [a["id"] for a in result.activities] == [101, 102, 103]
+    assert result.scanned == 103
+    assert result.truncated is False
+
+
+def test_pagination_stops_on_short_page(strava_env):
+    """A page smaller than per_page is the last one — don't request another."""
+    _write_tokens(strava_env)
+    seen = []
+    pages = [_acts(1, 50, "Sail"), _acts(51, 10, "Sail")]
+    result = strava_api.fetch_sail_activities(
+        per_page=50, http=_client(_paging_handler(pages, seen)))
+    assert seen == [1, 2]
+    assert len(result.activities) == 60
+    assert result.truncated is False
+
+
+def test_pagination_stops_on_empty_page(strava_env):
+    """An exact multiple of per_page needs one more request to learn it ended."""
+    _write_tokens(strava_env)
+    seen = []
+    result = strava_api.fetch_sail_activities(
+        per_page=50, http=_client(_paging_handler([_acts(1, 50, "Sail")], seen)))
+    assert seen == [1, 2]
+    assert len(result.activities) == 50
+    assert result.truncated is False
+
+
+def test_pagination_caps_at_max_pages(strava_env):
+    """A runaway window must not hammer the API past the cap."""
+    _write_tokens(strava_env)
+    seen = []
+    pages = [_acts(1 + i * 50, 50, "Ride") for i in range(strava_api.MAX_PAGES + 3)]
+    result = strava_api.fetch_sail_activities(
+        per_page=50, http=_client(_paging_handler(pages, seen)))
+    assert seen == list(range(1, strava_api.MAX_PAGES + 1))
+    assert result.truncated is True
+    assert result.scanned == strava_api.MAX_PAGES * 50
+
+
+def test_window_params_repeat_on_every_page(strava_env):
+    """after/before must survive pagination or later pages drift out of window."""
+    _write_tokens(strava_env)
+    windows = []
+
+    def handler(request):
+        windows.append((request.url.params.get("after"),
+                        request.url.params.get("before")))
+        page = int(request.url.params.get("page", 1))
+        return httpx.Response(200, json=_acts(1 + (page - 1) * 50, 50, "Sail")
+                              if page == 1 else [])
+
+    strava_api.fetch_sail_activities(after=1747000000, before=1748000000,
+                                     per_page=50, http=_client(handler))
+    assert len(windows) == 2
+    assert all(w == ("1747000000", "1748000000") for w in windows)
 
 
 def test_api_401_raises_not_authorized(strava_env):

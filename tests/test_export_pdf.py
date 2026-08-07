@@ -1,7 +1,7 @@
 """PDF export smoke tests: real render, assertions on the extracted text layer.
 
-Model objects are built directly (no DB); a leg without a track exercises
-the no-map path, so no tile fetching happens anywhere in these tests.
+Model objects are built directly (no DB); no network access happens anywhere
+in these tests.
 """
 import io
 from datetime import datetime
@@ -100,11 +100,8 @@ def test_leg_pdf_contains_only_that_leg():
     assert "exported" in text
 
 
-def test_no_track_means_no_map_and_no_network():
-    # leg_context must not attempt any tile fetch for a track-less leg —
-    # passing no client would otherwise hit the network
+def test_missing_synoptic_chart_yields_none():
     context = leg_context(_empty_leg(), [])
-    assert context["track_map_uri"] is None
     assert context["synoptic_chart_uri"] is None
 
 

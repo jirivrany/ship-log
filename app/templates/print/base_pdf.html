@@ -9,8 +9,7 @@
     @bottom-left { content: "{{ voyage.name }} — ship log"; font-size: 7pt; color: #666; }
     @bottom-right { content: "page " counter(page) " / " counter(pages); font-size: 7pt; color: #666; }
   }
-  @page day { size: A4 landscape; }
-  .day-page { page: day; page-break-before: always; }
+  .day-page { page-break-before: always; }
   .first-page { page-break-before: avoid; }
 
   body { font-family: "DejaVu Sans", sans-serif; font-size: 9pt; color: #111; }
@@ -44,9 +43,8 @@
 
   table.entries { font-size: 7pt; }
   table.entries th, table.entries td { padding: 0.8mm 1mm; }
+  table.entries td.note { font-style: italic; color: #444; }
   .totals { margin-top: 2.5mm; display: flex; gap: 8mm; font-size: 8.5pt; }
-  .totals b { font-size: 10.5pt; }
-  .notes-block { margin-top: 3mm; }
 </style>
 </head>
 <body>

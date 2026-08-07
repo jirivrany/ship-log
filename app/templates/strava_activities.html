@@ -36,7 +36,7 @@
           <a href="/legs/{{ row.imported_leg.id }}" class="badge text-bg-success text-decoration-none">Imported →</a>
           {% else %}
           <form method="post" action="{{ post_base }}/{{ row.id }}/preview" class="d-inline">
-            <button type="submit" class="btn btn-outline-primary btn-sm">Import</button>
+            <button type="submit" class="btn btn-secondary btn-sm">Import</button>
           </form>
           {% endif %}
         </td>
@@ -46,6 +46,21 @@
   </table>
 </div>
 {% else %}
-<div class="card p-4 text-muted">No sailing activities found in your recent Strava timeline.</div>
+<div class="card p-4 text-muted">
+  {% if scan and scan.scanned %}
+  No sailing activities among the {{ scan.scanned }} activit{{ 'y' if scan.scanned == 1 else 'ies' }} in this window.
+  {% else %}
+  No activities at all in this window.
+  {% endif %}
+  {% if voyage.start_date or voyage.end_date %}
+  <div class="small mt-2">Check the voyage start/end dates — an activity outside them won't appear here.</div>
+  {% endif %}
+</div>
+{% endif %}
+{% if scan and scan.truncated %}
+<div class="alert alert-warning mt-3 mb-0 small">
+  Stopped after scanning {{ scan.scanned }} activities — this window is too wide to search completely,
+  so older sailing activities in it may be missing. Narrow the voyage dates to see them.
+</div>
 {% endif %}
 {% endblock %}

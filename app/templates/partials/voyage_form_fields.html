@@ -10,11 +10,15 @@
   </div>
   <div class="col-md-2">
     <label class="form-label">Start date</label>
-    <input type="date" class="form-control" name="start_date" value="{{ v.start_date or '' }}">
+    <input type="date" class="form-control" name="start_date" value="{{ v.start_date or '' }}"
+           oninput="prefillEndDate(this)">
   </div>
   <div class="col-md-2">
     <label class="form-label">End date</label>
-    <input type="date" class="form-control" name="end_date" value="{{ v.end_date or '' }}">
+    <input type="date" class="form-control" name="end_date" value="{{ v.end_date or '' }}"
+           {% if v and v.end_date %}data-touched="1"{% endif %}
+           min="{{ v.start_date or '' }}" oninput="this.dataset.touched = '1'">
+    <div class="form-text end-date-hint d-none">Prefilled — typical charter week</div>
   </div>
   <div class="col-md-4">
     <label class="form-label">Navigation area</label>
@@ -31,7 +35,7 @@
   <h6 class="text-uppercase text-muted fw-semibold mb-0">Boat identification</h6>
   <div class="d-flex align-items-center gap-2">
     <span class="boat-library-status small text-muted"></span>
-    <button type="button" class="btn btn-outline-primary btn-sm" onclick="fillFromBoatLibrary(this)">⚓ Fill from library</button>
+    <button type="button" class="btn btn-secondary btn-sm" onclick="fillFromBoatLibrary(this)">⚓ Fill from library</button>
   </div>
 </div>
 <div class="row g-3 mb-3">
@@ -139,6 +143,27 @@
 </div>
 
 <script>
+// A charter is a week by default: picking a start date fills the end date
+// seven days later. Only ever overwrites an empty or previously auto-filled
+// end date, so a deliberate end date survives an edit to the start.
+const CHARTER_DAYS = 7;
+
+function prefillEndDate(startInput) {
+  const form = startInput.closest('form');
+  const endInput = form.elements['end_date'];
+  const hint = form.querySelector('.end-date-hint');
+  if (!endInput || !startInput.value) return;
+  if (endInput.value && endInput.dataset.touched) return;
+
+  // Parse as UTC — 'YYYY-MM-DD' through the local-time Date ctor can shift a day.
+  const start = new Date(startInput.value + 'T00:00:00Z');
+  if (isNaN(start)) return;
+  start.setUTCDate(start.getUTCDate() + CHARTER_DAYS);
+  endInput.value = start.toISOString().slice(0, 10);
+  endInput.min = startInput.value;
+  if (hint) hint.classList.remove('d-none');
+}
+
 async function fillFromBoatLibrary(btn) {
   const form = btn.closest('form');
   const status = form.querySelector('.boat-library-status');

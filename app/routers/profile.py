@@ -19,7 +19,7 @@ def profile_page(request: Request, session: Session = Depends(get_session)):
     per_voyage = []
     for voyage in voyages:
         legs, leg_entries = gather_voyage_entries(session, voyage)
-        stats = compute_stats([e for leg in legs for e in leg_entries[leg.id]])
+        stats = aggregate_stats([compute_stats(leg_entries[leg.id]) for leg in legs])
         per_voyage.append((voyage, stats))
 
     # Area × role matrix: each voyage falls into exactly one (area, role) cell

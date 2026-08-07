@@ -11,7 +11,7 @@ from app.database import get_session
 from app.export import export_filename, leg_context, render_voyage_pdf
 from app.models import Leg, LogEntry, NavArea, Voyage
 from app.processors import loader
-from app.stats import compute_stats
+from app.stats import aggregate_stats, compute_stats
 from app.templates_env import templates
 
 router = APIRouter()
@@ -115,7 +115,9 @@ def voyage_detail(voyage_id: int, request: Request, session: Session = Depends(g
     legs, leg_entries = gather_voyage_entries(session, voyage)
 
     leg_stats = {leg.id: compute_stats(leg_entries[leg.id]) for leg in legs}
-    voyage_stats = compute_stats([e for leg in legs for e in leg_entries[leg.id]])
+    # Aggregate per-leg rather than over the flattened entries: wall clock across
+    # all legs would count the nights between them as time underway.
+    voyage_stats = aggregate_stats(list(leg_stats.values()))
 
     leg_tracks = {leg.id: _load_leg_track(leg) for leg in legs}
 

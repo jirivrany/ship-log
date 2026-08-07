@@ -20,14 +20,14 @@
 </h1>
 <div class="d-flex align-items-center gap-3 mb-4 flex-wrap">
   <p class="text-muted mb-0">{{ leg.date }}</p>
-  <a href="/legs/{{ leg.id }}/quick-note" class="btn btn-outline-primary btn-sm">+ Quick Note</a>
-  <a href="/legs/{{ leg.id }}/export.pdf" class="btn btn-outline-primary btn-sm">⬇ Export PDF</a>
+  <a href="/legs/{{ leg.id }}/quick-note" class="btn btn-secondary btn-sm">+ Quick Note</a>
+  <a href="/legs/{{ leg.id }}/export.pdf" class="btn btn-secondary btn-sm">⬇ Export PDF</a>
   {% if not leg.track_path %}
-  <a href="/legs/{{ leg.id }}/attach-track" class="btn btn-outline-primary btn-sm">Attach track file</a>
+  <a href="/legs/{{ leg.id }}/attach-track" class="btn btn-secondary btn-sm">Attach track file</a>
   {% endif %}
   {% if local_entries %}
   <form method="post" action="/legs/{{ leg.id }}/fetch-weather" class="d-flex align-items-center gap-2 mb-0">
-    <button type="submit" class="btn btn-outline-primary btn-sm">⛅ Fetch weather</button>
+    <button type="submit" class="btn btn-secondary btn-sm">⛅ Fetch weather</button>
     <label class="small text-muted d-flex align-items-center gap-1 mb-0">
       <input type="checkbox" name="overwrite" class="form-check-input mt-0"> overwrite existing
     </label>
@@ -53,7 +53,7 @@
              hx-vals='js:{"field": "sunset", "value": event.target.value}'>
     </span>
     <form method="post" action="/legs/{{ leg.id }}/fetch-forecast" class="d-flex align-items-center gap-2 mb-0 ms-auto">
-      <button type="submit" class="btn btn-outline-primary btn-sm">⛅ Fetch forecast</button>
+      <button type="submit" class="btn btn-secondary btn-sm">⛅ Fetch forecast</button>
       <label class="small text-muted d-flex align-items-center gap-1 mb-0">
         <input type="checkbox" name="overwrite" class="form-check-input mt-0"> overwrite existing
       </label>
@@ -138,12 +138,12 @@
 </div>
 
 <datalist id="sail-options">
-  <option value="Main + Genoa"></option>
-  <option value="Main R1 + Genoa"></option>
-  <option value="Main R2 + Jib"></option>
-  <option value="Main"></option>
-  <option value="Genoa"></option>
-  <option value="Jib"></option>
+  <option value="MG">Main + Genoa</option>
+  <option value="MJ">Main + Jib</option>
+  <option value="M">Main only</option>
+  <option value="G">Genoa only</option>
+  <option value="M1G">Main R1 + Genoa</option>
+  <option value="M2J">Main R2 + Jib</option>
   <option value="Spinnaker"></option>
   <option value="Gennaker"></option>
 </datalist>
@@ -382,5 +382,20 @@
       htmx.trigger(document.body, 'propulsionChanged');
     });
   }
+
+  // Sails describe canvas only: switching a row to motor/anchor clears its sail
+  // configuration, so a prefilled "MG" can't linger on a motoring entry.
+  // Delegated so HTMX-inserted rows are covered without rebinding.
+  document.getElementById('log-entries').addEventListener('change', (event) => {
+    const select = event.target.closest('.js-propulsion');
+    if (!select || ['sail', 'both'].includes(select.value)) return;
+
+    const sails = select.closest('tr').querySelector('.js-sails');
+    if (!sails || !sails.value) return;
+
+    sails.value = '';
+    const body = new URLSearchParams({ field: 'sails', value: '' });
+    fetch(sails.getAttribute('hx-patch'), { method: 'PATCH', body });
+  });
 </script>
 {% endblock %}

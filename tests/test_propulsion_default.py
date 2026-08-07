@@ -67,7 +67,7 @@ def staged_fit(voyage_id):
     return str(dest)
 
 
-def _create_leg(client, voyage_id, track_path, default_propulsion=None):
+def _create_leg(client, voyage_id, track_path, default_propulsion=None, default_sails=None):
     # app.main.os.makedirs is patched to a no-op by the `client` fixture (it
     # guards the lifespan startup mkdir), so create_leg's own leg_dir mkdir
     # is a no-op too — pre-create the destination dir the test will move into.
@@ -83,6 +83,8 @@ def _create_leg(client, voyage_id, track_path, default_propulsion=None):
     }
     if default_propulsion is not None:
         data["default_propulsion"] = default_propulsion
+    if default_sails is not None:
+        data["default_sails"] = default_sails
     return client.post(f"/voyages/{voyage_id}/legs", data=data)
 
 
@@ -109,6 +111,28 @@ def test_explicit_sail_default_respected_except_when_forced(client, voyage_id, s
     assert entries
     # Explicit non-motor leg default is respected, including at the anchors.
     assert all(e.propulsion.value == "sail" for e in entries)
+
+
+@pytest.mark.skipif(not os.path.exists(SAMPLE_FIT), reason="sample FIT fixture not available")
+def test_sail_prefill_applied_to_all_entries(client, voyage_id, staged_fit, db_session):
+    r = _create_leg(client, voyage_id, staged_fit, default_propulsion="sail", default_sails="MG")
+    assert r.status_code == 200
+
+    entries = db_session.exec(select(LogEntry)).all()
+    assert entries
+    assert all(e.sails == "MG" for e in entries)
+
+
+@pytest.mark.skipif(not os.path.exists(SAMPLE_FIT), reason="sample FIT fixture not available")
+def test_sail_prefill_ignored_for_motor_propulsion(client, voyage_id, staged_fit, db_session):
+    # The form disables the field for motor, but a stale/hand-crafted POST must
+    # not stamp a sail configuration onto entries that carry no canvas.
+    r = _create_leg(client, voyage_id, staged_fit, default_propulsion="motor", default_sails="MG")
+    assert r.status_code == 200
+
+    entries = db_session.exec(select(LogEntry)).all()
+    assert entries
+    assert all(e.sails is None for e in entries)
 
 
 @pytest.mark.skipif(not os.path.exists(SAMPLE_FIT), reason="sample FIT fixture not available")

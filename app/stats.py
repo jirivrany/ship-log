@@ -137,4 +137,6 @@ def aggregate_stats(stats_list: list[dict]) -> dict:
         "sail_hhmm":     _format_hhmm(sums.get("sail_min",     0.0)),
         "both_hhmm":     _format_hhmm(sums.get("both_min",     0.0)),
         "voyage_count": len(stats_list),
+        # unrounded sums, so aggregates can be aggregated again (legs → voyage → profile)
+        "raw": sums,
     }
