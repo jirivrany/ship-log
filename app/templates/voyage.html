@@ -119,7 +119,16 @@
         <div class="d-flex justify-content-between border-bottom py-1 small"><span class="text-muted">Skipper</span><span class="fw-medium">{{ voyage.skipper }}</span></div>
         {% endif %}
         {% if voyage.crew %}
-        <div class="d-flex justify-content-between border-bottom py-1 small"><span class="text-muted">Crew</span><span class="fw-medium">{{ voyage.crew }}</span></div>
+        {# Crew is entered as a comma-separated list; one name per line keeps
+           the value right-aligned instead of wrapping under the label. #}
+        <div class="d-flex justify-content-between border-bottom py-1 small gap-3">
+          <span class="text-muted">Crew</span>
+          <span class="fw-medium text-end">
+            {%- for member in voyage.crew.split(',') if member.strip() %}
+            <div>{{ member.strip() }}</div>
+            {%- endfor %}
+          </span>
+        </div>
         {% endif %}
       </div>
 
