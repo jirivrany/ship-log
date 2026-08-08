@@ -175,6 +175,13 @@
     </tbody>
   </table>
 </div>
+
+{# Entries save on blur, so there is nothing left to submit here — the button
+   exists to close the editing session and get back to the voyage. It says
+   "Save" because that is what finishing an edit feels like. #}
+<div class="d-flex justify-content-end mt-3 mb-4">
+  <a href="/voyages/{{ voyage.id }}" class="btn btn-primary">Save &amp; Close</a>
+</div>
 {% endblock %}
 
 {% block scripts %}
