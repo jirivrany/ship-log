@@ -36,6 +36,24 @@ def _save_upload(file: UploadFile, dest_dir: str) -> str:
     return dest
 
 
+def _optional_float(value: str | None) -> float | None:
+    """Parse a form field that may legitimately be blank.
+
+    Browsers send absent numbers as empty strings, and JS template
+    interpolation can produce the literal "null"/"undefined". All of those mean
+    "no reading", not a validation error.
+    """
+    if value is None:
+        return None
+    text = value.strip()
+    if text in ("", "null", "undefined", "None"):
+        return None
+    try:
+        return float(text)
+    except ValueError:
+        return None
+
+
 def _generate_gps_entries(
     leg_id: int,
     track_path: str,
@@ -561,15 +579,22 @@ def add_manual_entry(
     ts: str = Form(...),
     lat: float = Form(...),
     lon: float = Form(...),
-    course: float = Form(None),
-    speed: float = Form(None),
-    dist_nm: float = Form(None),
-    temp: float = Form(None),
+    course: str = Form(""),
+    speed: str = Form(""),
+    dist_nm: str = Form(""),
+    temp: str = Form(""),
     session: Session = Depends(get_session),
 ):
     leg = session.get(Leg, leg_id)
     if not leg:
         return HTMLResponse("Not found", status_code=404)
+
+    # These come from FIT track points, which often lack course/temperature.
+    # Accept them as text so a blank field means "no value" rather than a 422.
+    course_val = _optional_float(course)
+    speed_val = _optional_float(speed)
+    dist_nm_val = _optional_float(dist_nm)
+    temp_val = _optional_float(temp)
 
     from datetime import datetime, timezone as tz_mod
     from app.models import EntrySource
@@ -593,10 +618,10 @@ def add_manual_entry(
         lat=lat,
         lon=lon,
         source=EntrySource.manual,
-        course=course,
-        speed=speed,
-        log_value=dist_nm,
-        air_temperature=temp,
+        course=course_val,
+        speed=speed_val,
+        log_value=dist_nm_val,
+        air_temperature=temp_val,
         propulsion=inherit.propulsion if inherit else PropulsionType.motor,
         wind_direction=inherit.wind_direction if inherit else None,
         wind_force=inherit.wind_force if inherit else None,

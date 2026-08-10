@@ -25,12 +25,21 @@
 <div class="d-flex flex-column gap-2">
   {% for voyage in voyages %}
   <a href="/voyages/{{ voyage.id }}" class="card card-body text-decoration-none text-dark voyage-card">
-    <div class="fw-semibold">{{ voyage.name }}</div>
+    <div class="fw-semibold">
+      {{ voyage.name }}
+      {# A voyage over New Year spans two years — show both, so the end year
+         is not lost when the date line below drops it. #}
+      {% if voyage.start_date %}
+      {% set start_year = voyage.start_date | datetimeformat("%Y") %}
+      {% set end_year = voyage.end_date | datetimeformat("%Y") if voyage.end_date else start_year %}
+      <span class="text-muted fw-normal">{{ start_year }}{% if end_year != start_year %}/{{ end_year }}{% endif %}</span>
+      {% endif %}
+    </div>
     <div class="text-muted small">
       {% if voyage.start_date and voyage.end_date %}
-        {{ voyage.start_date | datetimeformat("%-d.%-m.") }}–{{ voyage.end_date | datetimeformat("%-d.%-m.%Y") }} ·
+        {{ voyage.start_date | datetimeformat("%-d.%-m.") }}–{{ voyage.end_date | datetimeformat("%-d.%-m.") }} ·
       {% elif voyage.start_date %}
-        {{ voyage.start_date | datetimeformat("%-d.%-m.%Y") }} ·
+        {{ voyage.start_date | datetimeformat("%-d.%-m.") }} ·
       {% endif %}
       {{ voyage.boat_label }}
       {% if voyage.registration_number %} · {{ voyage.registration_number }}{% endif %}

@@ -70,7 +70,16 @@ def boat_library_lookup(name: str = "", maker: str = "", model: str = ""):
 
 @router.get("/", response_class=HTMLResponse)
 def index(request: Request, session: Session = Depends(get_session)):
-    voyages = session.exec(select(Voyage).order_by(Voyage.created_at.desc())).all()
+    # Newest voyage first, by when it was sailed rather than when it was
+    # entered. start_date is an ISO string, so it sorts correctly as text;
+    # voyages without one fall to the bottom, most recently created first.
+    voyages = session.exec(
+        select(Voyage).order_by(
+            Voyage.start_date.is_(None),
+            Voyage.start_date.desc(),
+            Voyage.created_at.desc(),
+        )
+    ).all()
     return templates.TemplateResponse("index.html", {"request": request, "voyages": voyages})
 
 

@@ -238,11 +238,11 @@
         .setContent(
           `<strong>Add log entry here?</strong><br>` +
           `${new Date(best.ts).toLocaleTimeString('cs-CZ', {hour:'2-digit', minute:'2-digit', timeZone:'{{ leg.timezone }}'})}<br>` +
-          `COG ${best.cog ?? '—'}° &nbsp; SOG ${best.speed} kn<br><br>` +
+          `COG ${best.cog ?? '—'}° &nbsp; SOG ${best.speed ?? '—'} kn<br><br>` +
           `<button onclick="addEntry(this)" ` +
           `data-ts="${best.ts}" data-lat="${best.lat}" data-lon="${best.lon}" ` +
-          `data-cog="${best.cog ?? ''}" data-speed="${best.speed}" ` +
-          `data-dist="${best.dist_nm}" data-temp="${best.temp ?? ''}" ` +
+          `data-cog="${best.cog ?? ''}" data-speed="${best.speed ?? ''}" ` +
+          `data-dist="${best.dist_nm ?? ''}" data-temp="${best.temp ?? ''}" ` +
           `class="popup-delete-btn" style="background:#f0fdf4;border-color:#bbf7d0;color:#166534">` +
           `Add entry</button>`
         )
@@ -264,13 +264,21 @@
 
   function addEntry(btn) {
     const body = new FormData();
-    body.append('ts',       btn.dataset.ts);
-    body.append('lat',      btn.dataset.lat);
-    body.append('lon',      btn.dataset.lon);
-    body.append('course',   btn.dataset.cog);
-    body.append('speed',    btn.dataset.speed);
-    body.append('dist_nm',  btn.dataset.dist);
-    body.append('temp',     btn.dataset.temp);
+    // Track points routinely lack course/temp (and speed on the first sample).
+    // Sending those as empty strings makes the float form fields fail validation,
+    // so omit them entirely and let the server default them to None.
+    const put = (key, value) => {
+      if (value !== undefined && value !== null && value !== '' && value !== 'undefined' && value !== 'null') {
+        body.append(key, value);
+      }
+    };
+    put('ts',       btn.dataset.ts);
+    put('lat',      btn.dataset.lat);
+    put('lon',      btn.dataset.lon);
+    put('course',   btn.dataset.cog);
+    put('speed',    btn.dataset.speed);
+    put('dist_nm',  btn.dataset.dist);
+    put('temp',     btn.dataset.temp);
 
     map.closePopup();
 
