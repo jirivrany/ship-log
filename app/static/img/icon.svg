@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <rect width="512" height="512" fill="#ffffff"/>
+
+  <g fill="#000000">
+    <!-- mast + masthead pennant as one shape, so nothing floats free -->
+    <path d="M228 52 L238 52 L241 100 L152 122 L243 146 L252 368 L236 368 Z"/>
+
+    <!-- jib: forward of the mast, narrow gap along the luff -->
+    <path d="M222 108 C 192 200, 152 302, 100 366 L226 350 C 232 268, 228 182, 222 108 Z"/>
+
+    <!-- mainsail: full curved leech, clew low and aft -->
+    <path d="M256 104 C 326 162, 392 264, 426 350 L260 370 C 264 278, 262 186, 256 104 Z"/>
+
+    <!-- hull: thin wedge, sheer sweeping up to the bow -->
+    <path d="M44 398 L470 354 C 454 402, 412 434, 364 442 L62 442 Z"/>
+  </g>
+</svg>
