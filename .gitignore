@@ -1,3 +1,6 @@
+# project local
+features/
+
 # Claude code
 .claude/
 
