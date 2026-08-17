@@ -8,7 +8,9 @@
 <a href="{{ back_url }}" class="text-muted small text-decoration-none">← {{ voyage.name }}</a>
 {% endif %}
 <h1 class="h3 mt-1 mb-1">Import from Strava</h1>
-{% if voyage.start_date or voyage.end_date %}
+{% if attach_leg and attach_leg.date %}
+<p class="text-muted mb-4">Sailing activities around {{ attach_leg.date }} <span class="small">(leg date)</span></p>
+{% elif voyage.start_date or voyage.end_date %}
 <p class="text-muted mb-4">Sailing activities {{ voyage.start_date or '…' }} → {{ voyage.end_date or '…' }} <span class="small">(voyage dates)</span></p>
 {% else %}
 <p class="text-muted mb-4">Recent sailing activities from your Strava timeline — set voyage start/end dates to reach older ones</p>
@@ -52,7 +54,9 @@
   {% else %}
   No activities at all in this window.
   {% endif %}
-  {% if voyage.start_date or voyage.end_date %}
+  {% if attach_leg and attach_leg.date %}
+  <div class="small mt-2">Only activities around this leg's date ({{ attach_leg.date }}) are listed — correct the leg date if the activity you want is on another day.</div>
+  {% elif voyage.start_date or voyage.end_date %}
   <div class="small mt-2">Check the voyage start/end dates — an activity outside them won't appear here.</div>
   {% endif %}
 </div>

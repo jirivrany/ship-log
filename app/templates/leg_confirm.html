@@ -19,22 +19,28 @@
 
     {% if not attach_leg %}
     <input type="hidden" name="timezone" value="{{ meta.timezone }}">
+    {% endif %}
     <h6 class="text-uppercase text-muted fw-semibold border-bottom pb-2 mb-3">Route</h6>
+    {# On the attach path the leg already has a route, so the parsed values are
+       a suggestion: they win when the track knows better, but whatever is left
+       in the fields is what gets saved. #}
+    {% if attach_leg %}
+    <p class="text-muted small mb-3">Prefilled from the track where available — edit to keep your own port names</p>
+    {% endif %}
     <div class="row g-3 mb-3">
       <div class="col-md-3">
         <label class="form-label">Date</label>
-        <input type="date" class="form-control form-control-sm" name="date" value="{{ meta.date }}" required>
+        <input type="date" class="form-control form-control-sm" name="date" value="{{ meta.date or (attach_leg.date if attach_leg else '') }}" required>
       </div>
       <div class="col-md-4">
         <label class="form-label">From Port</label>
-        <input type="text" class="form-control form-control-sm" name="from_port" value="{{ meta.from_port or '' }}" placeholder="e.g. Sukošan" required>
+        <input type="text" class="form-control form-control-sm" name="from_port" value="{{ meta.from_port or (attach_leg.from_port if attach_leg else '') }}" placeholder="e.g. Sukošan" required>
       </div>
       <div class="col-md-4">
         <label class="form-label">To Port</label>
-        <input type="text" class="form-control form-control-sm" name="to_port" value="{{ meta.to_port or '' }}" placeholder="e.g. Ždrelac" required>
+        <input type="text" class="form-control form-control-sm" name="to_port" value="{{ meta.to_port or (attach_leg.to_port if attach_leg else '') }}" placeholder="e.g. Ždrelac" required>
       </div>
     </div>
-    {% endif %}
 
     {% if meta.total_distance_nm or meta.start_time %}
     <div class="d-flex gap-4 px-3 py-2 mb-4 rounded" style="background:#f0f9ff;border:1px solid #bae6fd;font-size:13px;">

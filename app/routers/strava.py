@@ -48,6 +48,11 @@ def strava_callback(code: str = "", state: str = "/", error: str = ""):
     return RedirectResponse(_safe_next(state))
 
 
+def _epoch(date_str: str, days_offset: int) -> int:
+    dt = datetime.strptime(date_str, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+    return int((dt + timedelta(days=days_offset)).timestamp())
+
+
 def _voyage_window(voyage: Voyage) -> tuple[int | None, int | None]:
     """Epoch bounds for the picker from the voyage's charter dates.
 
@@ -56,18 +61,30 @@ def _voyage_window(voyage: Voyage) -> tuple[int | None, int | None]:
     Either bound may be None when the voyage has no dates — then the
     picker falls back to the plain recent timeline.
     """
-    def _epoch(date_str: str, days_offset: int) -> int:
-        dt = datetime.strptime(date_str, "%Y-%m-%d").replace(tzinfo=timezone.utc)
-        return int((dt + timedelta(days=days_offset)).timestamp())
-
     after = _epoch(voyage.start_date, -1) if voyage.start_date else None
     before = _epoch(voyage.end_date, +2) if voyage.end_date else None
     return after, before
 
 
-def _activity_rows(session: Session, voyage: Voyage) -> tuple[list[dict], dict]:
+def _leg_window(leg: Leg) -> tuple[int | None, int | None]:
+    """Epoch bounds around a single leg's date.
+
+    Pairing one leg means one day's sailing, so the voyage-wide window is
+    needless scrolling. Same generous margins as the voyage window, for the
+    same timezone reasons. Returns (None, None) for a dateless leg, which
+    tells the caller to fall back to the voyage window.
+    """
+    if not leg.date:
+        return None, None
+    return _epoch(leg.date, -1), _epoch(leg.date, +2)
+
+
+def _activity_rows(session: Session, voyage: Voyage,
+                   leg: Leg = None) -> tuple[list[dict], dict]:
     """Picker rows plus a scan summary used to explain an empty result."""
-    after, before = _voyage_window(voyage)
+    after, before = _leg_window(leg) if leg else (None, None)
+    if after is None and before is None:
+        after, before = _voyage_window(voyage)
     result = strava_api.fetch_sail_activities(after=after, before=before)
     ids = [a["id"] for a in result.activities]
     imported: dict[int, Leg] = {}
@@ -88,7 +105,7 @@ def _render_picker(request: Request, session: Session, *, voyage: Voyage,
                    post_base: str, back_url: str, self_url: str,
                    attach_leg: Leg = None):
     try:
-        rows, scan = _activity_rows(session, voyage)
+        rows, scan = _activity_rows(session, voyage, attach_leg)
     except strava_api.StravaNotAuthorized:
         return RedirectResponse(f"/strava/authorize?next={self_url}")
     except strava_api.StravaConfigError as e:

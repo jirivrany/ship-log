@@ -23,6 +23,7 @@
   <a href="/legs/{{ leg.id }}/quick-note" class="btn btn-secondary btn-sm">+ Quick Note</a>
   <a href="/legs/{{ leg.id }}/export.pdf" class="btn btn-secondary btn-sm">⬇ Export PDF</a>
   {% if not leg.track_path %}
+  <a href="/legs/{{ leg.id }}/strava" class="btn btn-secondary btn-sm">Import from Strava</a>
   <a href="/legs/{{ leg.id }}/attach-track" class="btn btn-secondary btn-sm">Attach track file</a>
   {% endif %}
   {% if local_entries %}

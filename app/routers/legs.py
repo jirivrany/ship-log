@@ -295,6 +295,9 @@ async def attach_track(
     track_path: str = Form(...),
     strava_activity_id: Optional[int] = Form(None),
     description: Optional[str] = Form(None),
+    date: Optional[str] = Form(None),
+    from_port: Optional[str] = Form(None),
+    to_port: Optional[str] = Form(None),
     default_propulsion: str = Form("motor"),
     default_sails: Optional[str] = Form(None),
     default_wind_direction: Optional[str] = Form(None),
@@ -310,6 +313,17 @@ async def attach_track(
     real_track = pathlib.Path(track_path).resolve()
     if not str(real_track).startswith(str(staging_dir) + os.sep):
         raise HTTPException(status_code=400, detail="Invalid file path")
+
+    # The confirm form offers the parsed route back for editing; a manually
+    # created leg keeps whatever the user left in the fields. Applied before
+    # leg_dir is derived below, so the track files under the final name — and
+    # so the traversal guard sees the values actually being saved.
+    if date:
+        leg.date = date
+    if from_port:
+        leg.from_port = from_port
+    if to_port:
+        leg.to_port = to_port
 
     # Validate leg_dir stays inside UPLOAD_DIR (guards against .. in stored port names)
     upload_root = pathlib.Path(UPLOAD_DIR).resolve()
