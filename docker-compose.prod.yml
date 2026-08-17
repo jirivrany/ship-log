@@ -1,0 +1,25 @@
+# Production compose file. See DEPLOYMENT.md §4.2.
+#
+# Differences from the dev docker-compose.yml, both deliberate:
+#   - no `.:/app` bind mount — the image's `COPY . .` is the code, so deploys
+#     are reproducible and a stray file on the server can't change behaviour
+#   - no `--reload` — halves idle memory and drops the file watcher
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    # Loopback only: nginx is the sole client. Publishing to 0.0.0.0 would be
+    # reachable from the internet even with UFW denying it (DEPLOYMENT.md §4.4).
+    ports:
+      - "127.0.0.1:8000:8000"
+    # Host uid:gid, from .env — see DEPLOYMENT.md §4.3.
+    user: "${UID_GID}"
+    volumes:
+      - ./data:/app/data           # data only; NOT the source tree
+    environment:
+      - DATABASE_URL=sqlite:////app/data/ship_log.db
+      - UPLOAD_DIR=/app/data/uploads
+      - STRAVA_CLIENT_ID=${STRAVA_CLIENT_ID:-}
+      - STRAVA_CLIENT_SECRET=${STRAVA_CLIENT_SECRET:-}
+      - STRAVA_REDIRECT_URI=${STRAVA_REDIRECT_URI:-}
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000

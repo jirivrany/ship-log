@@ -37,19 +37,22 @@ You already have a sudo user from the install (call it `<youruser>`). You have t
 
 The rest of this document assumes a dedicated `shiplog` account, because it makes the trust boundary explicit. If you prefer the simpler route, substitute `<youruser>` for `shiplog` throughout and skip this subsection.
 
-```bash
-sudo adduser --disabled-password --gecos "" shiplog
-# deliberately NOT in the sudo group
+**`shiplog` has no inbound SSH access at all** — no password, no `authorized_keys`, and it is not listed in `AllowUsers` (§2.2). You reach it only by logging in as `<youruser>` and switching:
 
-# give it your SSH key by copying from your own account (not from /root, which is empty)
-sudo mkdir -p /home/shiplog/.ssh
-sudo cp ~/.ssh/authorized_keys /home/shiplog/.ssh/
-sudo chown -R shiplog:shiplog /home/shiplog/.ssh
-sudo chmod 700 /home/shiplog/.ssh
-sudo chmod 600 /home/shiplog/.ssh/authorized_keys
+```bash
+sudo su - shiplog
 ```
 
-Verify `ssh shiplog@<ip>` works **in a second terminal** before changing any SSH settings. Keep your first session open until it does — a broken sshd config with no open session means a console/rescue trip to the provider.
+This is deliberately stricter than giving it its own key. It means the server exposes exactly **one** account to the network, and `shiplog` becomes a privilege boundary rather than a second entry point: reaching it requires already holding your key *and* sudo. A stolen laptop key alone gets an attacker to `<youruser>`, not straight to the data.
+
+```bash
+sudo adduser --disabled-password --gecos "" shiplog
+# no sudo group, no SSH key, no password — reachable only via `sudo su - shiplog`
+```
+
+`--disabled-password` locks the password; combined with the sshd config below, the account cannot authenticate over the network by any method.
+
+**Keep its login shell as `/bin/bash`.** Setting `/usr/sbin/nologin` looks tempting for a service account, but it breaks `sudo su - shiplog` as well — `su -` invokes the target's login shell and `nologin` refuses. You would be pushed to `sudo -u shiplog bash`, which starts a non-login shell that skips `~/.profile` and does not pick up the `docker` group, and it would also break the `shiplog` crontab in §7.3. The account is unreachable because sshd rejects it, not because its shell is broken locally.
 
 ### 2.2 SSH hardening
 
@@ -62,16 +65,20 @@ KbdInteractiveAuthentication no
 PubkeyAuthentication yes
 X11Forwarding no
 MaxAuthTries 3
-AllowUsers shiplog <youruser>
+AllowUsers <youruser>
 ```
 
-`AllowUsers` must list **both** accounts — `shiplog` for deploys and `<youruser>` for admin. Omitting your sudo account locks you out of all privileged work.
+`AllowUsers` lists **only** your admin account. `shiplog` is deliberately absent (§2.1), so sshd refuses it before authentication is even attempted — belt and braces alongside its locked password and empty `authorized_keys`.
+
+Make sure `<youruser>` is spelled correctly here: this single line is now the only account allowed in, so a typo locks you out of the server entirely.
 
 ```bash
 sudo sshd -t && sudo systemctl restart ssh
 ```
 
 `sshd -t` validates the config; if it errors, fix it *before* restarting, while you still have a working session.
+
+Then, **keeping this session open**, confirm `ssh <youruser>@<ip>` still works from a second terminal. `sshd -t` catches syntax errors but not a misspelled username in `AllowUsers` — and with only one account permitted, that mistake means a console/rescue trip to the provider.
 
 ### 2.3 Updates and fail2ban
 
@@ -113,35 +120,9 @@ sudo ufw allow 443/tcp comment 'https'
 sudo ufw enable
 ```
 
-### Why port 80 is open (revised decision)
+Port 80 stays open permanently: Let's Encrypt's HTTP-01 challenge can only be validated there, so gating it behind certbot renewal hooks risks a *silent* renewal failure and an expired cert while you're at sea. What listens on it is nginx serving a redirect to HTTPS (§6), so the exposure is small and a bare `<domain>` typed on a phone still lands on TLS.
 
-The original draft of this plan closed port 80 and opened it briefly via certbot renewal hooks. **That was the wrong call — keep it open.** The reasoning:
-
-- **HTTP-01 can only be validated on port 80.** Let's Encrypt refuses to validate on any other port by design, and it cannot be done over 443. Port 80 is therefore not optional for this challenge type; the only question is continuous vs. bursts.
-- **The hook approach fails exactly when you can't fix it.** A non-executable hook, a `ufw delete` that doesn't match the rule, or a UFW behaviour change makes renewal fail *silently*. The certificate then expires ~60 days later, plausibly while you're at sea with only a phone. A silently expired cert is a worse outcome than an open port 80.
-- **Exposure is small.** What listens on 80 is nginx serving a redirect — the same nginx already exposed on 443, on a well-audited code path.
-- **You get the HTTPS redirect back**, so a bare `<domain>` typed on the phone lands on HTTPS instead of failing to connect.
-
-Note on a common misconception: modern browsers do **not** block port 80. Chrome and Firefox *prefer* HTTPS — they upgrade typed navigations and warn before falling back — but plain HTTP still works when something is listening. So browser behaviour is not an argument for closing it; the redirect in §6 is what actually guarantees you end up on TLS.
-
-**The stronger alternative, if you want it:** DNS-01 validation needs no inbound port at all, so port 80 could stay closed. The cost is that your DNS provider must have an API and you must store DNS-write credentials on the server. If your domain is on Cloudflare/Route53/similar, this is a genuine upgrade — install `python3-certbot-dns-<provider>` and issue with `--dns-<provider>` instead of `--nginx`. For a single-user app, either choice is defensible.
-
-**Docker/UFW trap:** Docker writes its own iptables rules that bypass UFW, so a container published to `0.0.0.0` is reachable from the internet even with UFW denying it. Two defences, apply both:
-
-1. Publish to loopback only in the compose file: `127.0.0.1:8000:8000` (§4).
-2. Set `"iptables": false` is *not* recommended (breaks container networking); instead add to `/etc/docker/daemon.json`:
-
-```json
-{ "ip6tables": true, "userland-proxy": false }
-```
-
-and verify after starting the stack:
-
-```bash
-ss -tlnp | grep 8000      # must show 127.0.0.1:8000, never 0.0.0.0:8000
-```
-
-From your laptop: `nmap -Pn -p 22,80,443,8000 <server-ip>` — expect 22, 80 and 443 open, and **8000 closed**. Port 8000 showing as open means the Docker/UFW bypass has bitten you; fix the publish spec before going further.
+Docker's firewall interaction is handled in §4.4, once Docker is actually installed.
 
 ---
 
@@ -149,61 +130,132 @@ From your laptop: `nmap -Pn -p 22,80,443,8000 <server-ip>` — expect 22, 80 and
 
 ### 4.1 Code and Docker
 
+Install Docker from **Docker's own apt repository**, not from Ubuntu's `docker.io` package. Ubuntu's package is an unofficial build that lags upstream, and Docker's docs list it as a conflicting package that must be removed before the official one will install. It also does not ship `docker compose` v2 or buildx as plugins in the layout the rest of this document assumes.
+
+Remove any conflicting packages first (apt may report none are installed — that is fine):
+
 ```bash
-sudo apt install -y docker.io docker-compose-v2 git
-sudo systemctl enable --now docker
-sudo usermod -aG docker shiplog     # takes effect on shiplog's next login
+sudo apt remove $(dpkg --get-selections docker.io docker-compose docker-compose-v2 \
+  docker-doc docker-buildx podman-docker containerd runc | cut -f1)
 ```
 
-Note that `docker` group membership is equivalent to root access (a container can mount the host filesystem). This is why `shiplog` is *not* also in the `sudo` group — it would add nothing but would widen what a stolen SSH key reaches.
+Add Docker's repository and GPG key:
 
-Then, **logged in as `shiplog`** (`ssh shiplog@<ip>`), generate a key with `ssh-keygen -t ed25519`, add `~/.ssh/id_ed25519.pub` as a **read-only deploy key** on the GitHub repo, and clone:
+```bash
+sudo apt update
+sudo apt install -y ca-certificates curl git
+sudo install -m 0755 -d /etc/apt/keyrings
+sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+sudo chmod a+r /etc/apt/keyrings/docker.asc
+
+sudo tee /etc/apt/sources.list.d/docker.sources <<EOF
+Types: deb
+URIs: https://download.docker.com/linux/ubuntu
+Suites: $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}")
+Components: stable
+Architectures: $(dpkg --print-architecture)
+Signed-By: /etc/apt/keyrings/docker.asc
+EOF
+
+sudo apt update
+```
+
+Then install the engine, CLI and plugins:
+
+```bash
+sudo apt install -y docker-ce docker-ce-cli containerd.io \
+  docker-buildx-plugin docker-compose-plugin
+sudo systemctl enable --now docker.service containerd.service
+sudo docker run hello-world          # verify
+sudo usermod -aG docker shiplog      # takes effect on shiplog's next login
+```
+
+`docker-compose-plugin` is what provides `docker compose` (space, not hyphen) — the form used throughout §7 and §8.
+
+Ubuntu Resolute 26.04 LTS is a supported target in Docker's OS requirements, so the `Suites:` line resolving to its codename gets a real package set.
+
+Note that `docker` group membership is equivalent to root access (a container can mount the host filesystem) — Docker's own post-install docs state the group "grants root-level privileges to the user". This is why `shiplog` is *not* also in the `sudo` group — it would add nothing but would widen what a stolen SSH key reaches.
+
+**Daemon settings.** Do this now, before any container starts. Create `/etc/docker/daemon.json`:
+
+```json
+{ "ip6tables": true, "userland-proxy": false }
+```
+
+```bash
+sudo systemctl restart docker
+```
+
+`"iptables": false` is *not* an option here — it breaks container networking. The real defence against the UFW bypass is the publish spec in §4.2, verified in §4.4.
+
+Then switch to `shiplog` (`sudo su - shiplog` — it has no inbound SSH of its own, §2.1), generate a key with `ssh-keygen -t ed25519`, add `~/.ssh/id_ed25519.pub` as a **read-only deploy key** on the GitHub repo, and clone:
 
 ```bash
 git clone git@github.com:jirivrany/ship-log.git /home/shiplog/ship-log
 cd /home/shiplog/ship-log/ship_log
 ```
 
-### 4.2 A production compose file
+### 4.2 The production compose file
 
-The current `docker-compose.yml` is a dev file — it bind-mounts the whole source over `/app` and runs uvicorn with `--reload`. Do not use it in production. Add `docker-compose.prod.yml`:
+`docker-compose.prod.yml` is **already in the repo** — it arrives with the clone, no editing on the server. The dev `docker-compose.yml` bind-mounts the whole source over `/app` and runs uvicorn with `--reload`; do not use it in production.
 
-```yaml
-services:
-  app:
-    build: .
-    restart: unless-stopped
-    ports:
-      - "127.0.0.1:8000:8000"      # loopback only — nginx is the only client
-    volumes:
-      - ./data:/app/data           # data only; NOT the source tree
-    environment:
-      - DATABASE_URL=sqlite:////app/data/ship_log.db
-      - UPLOAD_DIR=/app/data/uploads
-      - STRAVA_CLIENT_ID=${STRAVA_CLIENT_ID:-}
-      - STRAVA_CLIENT_SECRET=${STRAVA_CLIENT_SECRET:-}
-      - STRAVA_REDIRECT_URI=https://<your-domain>/strava/callback
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+Two deliberate differences from the dev file: no `.:/app` mount (the image's `COPY . .` is the code, so deploys are reproducible and a stray file on the server can't change behaviour), and no `--reload` (halves idle memory and removes the file-watcher).
+
+`--host 0.0.0.0` inside the container is correct and safe — the `127.0.0.1:8000:8000` publish spec confines it to loopback on the host.
+
+Everything host-specific — `UID_GID`, the Strava credentials and `STRAVA_REDIRECT_URI` — comes from `.env`, which is gitignored. That is what lets the same tracked file work on both machines; see §4.3 and §6.1.
+
+### 4.3 Run the container as a non-root user
+
+Your `data/` is currently root-owned because the container runs as root. That is why the `Makefile` verify target shells into Alpine to copy files. On the server this would make backups and the sync in §7 need `sudo` — which `shiplog` doesn't have.
+
+**Do not bake a uid into the image.** Your laptop account is uid 1000, but on the server uid 1000 is the sudo account created by the Ubuntu installer, and `shiplog` — added afterwards — gets 1001 or higher. A `useradd -u 1000` in the Dockerfile would therefore write files owned by the *wrong* account on the server: the one you were trying to keep the app away from.
+
+Instead the image is uid-agnostic and the uid is set per host at run time. **Both tracked files already carry this** — nothing to edit on the server:
+
+- `Dockerfile` ends with `RUN useradd -m app && chown -R app:app /app` + `USER app` — note **no `-u 1000`**.
+- `docker-compose.prod.yml` sets `user: "${UID_GID}"` on the `app` service.
+
+`user:` overrides the image's `USER` with the numeric ids of whoever owns `data/` on that machine — so the same image and the same compose file work on laptop and server with no rebuild and no local edits. The `useradd` still matters: it stops the image *defaulting* to root if `UID_GID` is ever unset.
+
+The only per-host step is the `.env` entry, and `.env` is gitignored — so this never conflicts with a `git pull`:
+
+```bash
+# on the server, as shiplog, in /home/shiplog/ship-log/ship_log
+echo "UID_GID=$(id -u):$(id -g)" >> .env
 ```
 
-Two deliberate differences from the dev file: no `.:/app` mount (the image's `COPY . .` is the code, so deploys are reproducible and a stray local file can't change server behaviour), and no `--reload` (halves idle memory and removes the file-watcher).
+Then, **as `<youruser>`** (`shiplog` has no sudo), hand it the data directory:
 
-`--host 0.0.0.0` inside the container is correct and safe — the publish spec confines it to loopback on the host.
-
-### 4.3 Container writes files as root
-
-Your `data/` is already root-owned locally because the container runs as root. That is why the `Makefile` verify target shells into Alpine to copy files. On the server this makes backups and the sync in §7 need `sudo`.
-
-Worth fixing while you're setting up production — add to the `Dockerfile` before `CMD`:
-
-```dockerfile
-RUN useradd -m -u 1000 app && chown -R app:app /app
-USER app
+```bash
+sudo chown -R shiplog:shiplog /home/shiplog/ship-log/ship_log/data
 ```
 
-Then, once on the server, `sudo chown -R shiplog:shiplog data/` (uid 1000 in the image matches the first non-system account; verify with `id shiplog`). Afterwards backups, rsync and the dev pull all work **without `sudo`**, and a container escape lands as an unprivileged user.
+Locally you can ignore all of this — the dev `docker-compose.yml` is unchanged and has no `user:` key. If you want the laptop consistent too, add the same `.env` line and run `sudo chown -R $(id -u):$(id -g) data/` once to clear the existing root-owned files.
 
-This matters more than it looks under the §2.1 layout: `shiplog` has no sudo, so every `sudo` that appears in the data scripts below is a step you'd have to run as `<youruser>` instead. Doing this fix up front removes them all. If you defer it, run the data-touching commands in §7 from your sudo account instead.
+After this, backups, rsync and the §7.2 pull all work **without `sudo`**, and a container escape lands as an unprivileged account with no sudo rights.
+
+> **Do this before the first `docker compose up`.** Starting the stack first lets the container create root-owned files under `data/`, which you then have to chown anyway.
+
+### 4.4 Verify the container is not exposed (Docker/UFW trap)
+
+Docker's docs are blunt: "Docker and ufw use firewall rules in ways that make them incompatible with each other." Container traffic is routed in the `nat` table, so packets are diverted before reaching the `INPUT` chain UFW filters on — "effectively ignoring your firewall configuration." A container published to `0.0.0.0` is reachable from the internet even with UFW denying it, and Docker offers no workaround of its own. The `127.0.0.1:8000:8000` publish spec in §4.2 is therefore the actual defence, not a belt-and-braces extra — which is why it gets verified rather than assumed.
+
+Once the stack is up:
+
+```bash
+ss -tlnp | grep 8000      # must show 127.0.0.1:8000, never 0.0.0.0:8000
+```
+
+From your laptop:
+
+```bash
+nmap -Pn -p 22,80,443,8000 <server-ip>   # expect 22/80/443 open, 8000 CLOSED
+```
+
+Port 8000 showing as open means the bypass has bitten you — fix the publish spec before going further. Re-run both checks after any change to the compose file's `ports:` block; a dropped `127.0.0.1:` prefix exposes the app with no other visible symptom.
+
+**Do not hand-write `nft` rules on this box.** Docker is only compatible with `iptables-nft` and `iptables-legacy`; rules created with `nft` are not supported on a host running Docker. UFW goes through the iptables compatibility layer, so it is fine — but any custom container filtering belongs in the `DOCKER-USER` chain.
 
 ---
 
@@ -334,17 +386,22 @@ Stop the local container first so SQLite is not mid-write. A live copy of a SQLi
 cd ~/work/sailing/ship_log
 docker compose down
 sudo tar czf /tmp/shiplog-migrate.tgz -C data .
-scp /tmp/shiplog-migrate.tgz shiplog@<server>:/tmp/
+scp /tmp/shiplog-migrate.tgz <youruser>@<server>:/tmp/     # shiplog has no inbound SSH
 ```
 
 ```bash
-# server, as shiplog — the tarball contains root-owned files, so extract
-# with --no-same-owner to land them as shiplog rather than failing.
+# server: land it as <youruser>, then switch accounts to unpack.
+sudo su - shiplog
+
+# The laptop tarball holds root-owned files (written before the §4.3 fix), so
+# --no-same-owner lands them as shiplog — the uid the container now runs as.
 cd /home/shiplog/ship-log/ship_log
 mkdir -p data
 tar xzf /tmp/shiplog-migrate.tgz --no-same-owner -C data
 docker compose -f docker-compose.prod.yml up -d --build
 ```
+
+`/tmp` is world-readable, so `shiplog` can read the tarball your admin account dropped there — no `chown` needed in between.
 
 Check `https://<your-domain>` shows your voyages, then `rm /tmp/shiplog-migrate.tgz` on both machines.
 
@@ -354,10 +411,12 @@ Server is authoritative. This **overwrites your local data** — that is the int
 
 `scripts/pull-from-server.sh`:
 
+Because `shiplog` has no inbound SSH (§2.1), this connects as your **admin** account and uses `sudo -u shiplog` for anything touching the app's files:
+
 ```bash
 #!/usr/bin/env bash
 set -euo pipefail
-SERVER=shiplog@<your-domain>
+SERVER=<youruser>@<your-domain>          # NOT shiplog — it has no inbound SSH
 REMOTE=/home/shiplog/ship-log/ship_log/data
 LOCAL="$(cd "$(dirname "$0")/.." && pwd)/data"
 
@@ -365,19 +424,28 @@ echo "This OVERWRITES $LOCAL with the server copy. Ctrl-C to abort."
 read -r -p "Continue? [y/N] " a; [ "$a" = y ] || exit 1
 
 # Consistent snapshot: SQLite's own backup API, safe while the app is running.
-ssh "$SERVER" 'cd /home/shiplog/ship-log/ship_log && \
+ssh "$SERVER" 'sudo -u shiplog -H bash -c "cd /home/shiplog/ship-log/ship_log && \
   docker compose -f docker-compose.prod.yml exec -T app \
-  python -c "import sqlite3;s=sqlite3.connect(\"/app/data/ship_log.db\");d=sqlite3.connect(\"/app/data/_snapshot.db\");s.backup(d);d.close();s.close()"'
+  python -c \"import sqlite3;s=sqlite3.connect(\\\"/app/data/ship_log.db\\\");d=sqlite3.connect(\\\"/app/data/_snapshot.db\\\");s.backup(d);d.close();s.close()\""'
 
-rsync -av --delete "$SERVER:$REMOTE/" "$LOCAL/"
+# rsync reads as <youruser>, so make the tree readable to it; --rsync-path lets
+# the remote side run as shiplog instead of relying on group permissions.
+rsync -av --delete --rsync-path="sudo -u shiplog rsync" "$SERVER:$REMOTE/" "$LOCAL/"
 mv "$LOCAL/_snapshot.db" "$LOCAL/ship_log.db"
 
-# Remove the snapshot from inside the container: it wrote the file, so it owns it,
-# and `shiplog` has no sudo. (After the §4.3 non-root fix, a plain rm also works.)
-ssh "$SERVER" 'cd /home/shiplog/ship-log/ship_log && \
-  docker compose -f docker-compose.prod.yml exec -T app rm -f /app/data/_snapshot.db'
+ssh "$SERVER" 'sudo -u shiplog rm -f /home/shiplog/ship-log/ship_log/data/_snapshot.db'
 echo "Done."
 ```
+
+The `--rsync-path` trick is what keeps this working without loosening permissions on `data/`: rsync's remote half runs as `shiplog`, so it reads files that account owns, while the SSH session itself stays on your admin account.
+
+**This needs passwordless sudo for the specific commands**, or every run prompts for your password (and the `rsync` one cannot prompt at all — it would hang). Add `/etc/sudoers.d/shiplog-sync` with `sudo visudo -f /etc/sudoers.d/shiplog-sync`:
+
+```
+<youruser> ALL=(shiplog) NOPASSWD: /usr/bin/rsync, /usr/bin/docker, /usr/bin/rm, /usr/bin/bash
+```
+
+That is a real widening of `<youruser>`'s powers — but only to *become `shiplog`*, an account it could already reach interactively via `sudo su -`. It grants nothing new in kind, just removes the prompt. Use `visudo` rather than an editor: a malformed sudoers file can lock you out of sudo entirely.
 
 Using `sqlite3.backup()` rather than `cp` is what makes this safe to run while you're logging from the boat — a plain copy of a live SQLite file can land mid-transaction and produce a corrupt local DB.
 
@@ -401,15 +469,18 @@ docker compose -f docker-compose.prod.yml exec -T app rm -f /app/data/_bk.db
 find "$DEST" -name 'shiplog-*.tgz' -mtime +30 -delete
 ```
 
-The `tar` reads root-owned files while running as `shiplog`, which works only because the container leaves them world-readable (`-rw-r--r--`). That's fragile — another reason to apply the §4.3 non-root fix, after which ownership is simply correct.
+With §4.3 applied the container writes as `shiplog`, so the `tar` reads files it actually owns and the whole job needs no privileges. (Without that fix it would be reading root-owned files, working only by the accident of their being world-readable.)
 
 Install it as `shiplog`'s **own** crontab (no `sudo`, since the job needs no privileges):
 
 ```bash
+sudo su - shiplog
 chmod +x /home/shiplog/backup.sh
-crontab -e     # as shiplog
+crontab -e     # now editing shiplog's own crontab
 # 0 3 * * *  /home/shiplog/backup.sh >> /home/shiplog/backup.log 2>&1
 ```
+
+Cron runs the job as `shiplog` regardless of inbound SSH being disabled — the account not being reachable from the network has no bearing on local scheduled jobs. This is exactly why §2.1 keeps the login shell as `/bin/bash`: with `nologin`, cron could not start the job either.
 
 Local backups protect against app bugs, not against losing the VM. Add an off-box copy — either your provider's snapshots, or append to the pull script in §7.2 (running it after a trip is itself a backup). **Test a restore once**, before you rely on it at sea.
 
@@ -418,8 +489,9 @@ Local backups protect against app bugs, not against losing the VM. Add an off-bo
 ## 8. Deploy / update procedure
 
 ```bash
+ssh <youruser>@<your-domain>
+sudo su - shiplog
 cd /home/shiplog/ship-log/ship_log
-./  # -- steps:
 git pull
 docker compose -f docker-compose.prod.yml up -d --build
 docker compose -f docker-compose.prod.yml logs -f app   # confirm clean start
@@ -431,22 +503,21 @@ docker compose -f docker-compose.prod.yml logs -f app   # confirm clean start
 
 ## 9. Order of operations
 
-Each step notes which account to run it from — `<youruser>` is your sudo account from the Ubuntu install, `shiplog` is the unprivileged app account from §2.1.
+Each step notes which account to run it from — `<youruser>` is your sudo account from the Ubuntu install, `shiplog` is the unprivileged app account from §2.1. **All SSH is to `<youruser>`**; every `shiplog` step below is reached with `sudo su - shiplog` once you're on the box.
 
 1. **`<youruser>`** — §2 hardening (create `shiplog`, SSH config, fail2ban) + §3 firewall, before anything is listening
 2. DNS A record → server IP; confirm with `dig +short <your-domain>`
-3. **`<youruser>`** — install Docker/nginx/certbot packages (§4.1, §5, §6)
-4. **`shiplog`** — deploy key, clone, prod compose, `docker compose up` (§4.1–4.2); verify `ss -tlnp` shows `127.0.0.1:8000`
-5. **`<youruser>`** — §5 certbot issuance + `certbot renew --dry-run`
-6. **`<youruser>`** — §6 nginx basic auth, proxy and port-80 redirect; §6.1 Strava callback domain
-7. **`shiplog`** (+ laptop) — §7.1 data migration
-8. **`shiplog`** — §7.3 backups; then **verify a restore** before relying on it
-9. From the laptop — `nmap` to confirm 22/80/443 open and 8000 closed (§3)
+3. **`<youruser>`** — install Docker from Docker's apt repo (§4.1 — *not* `docker.io`), write `/etc/docker/daemon.json`, then nginx/certbot packages (§5, §6)
+4. **`shiplog`** — deploy key, clone, prod compose (§4.1–4.2); §4.3 non-root fix — `UID_GID` in `.env` + `chown data/` — **before** the first `docker compose up`
+5. **`shiplog`** (+ laptop) — §4.4 exposure check: `ss -tlnp` shows `127.0.0.1:8000`, `nmap` shows 8000 closed. **Do this before certbot** — no point publishing a hostname to a box that's leaking port 8000.
+6. **`<youruser>`** — §5 certbot issuance + `certbot renew --dry-run`
+7. **`<youruser>`** — §6 nginx basic auth, proxy and port-80 redirect; §6.1 Strava callback domain
+8. **`shiplog`** (+ laptop) — §7.1 data migration
+9. **`shiplog`** — §7.3 backups; then **verify a restore** before relying on it
 
 ---
 
 ## 10. Follow-ups worth doing after it's live
 
-- **Non-root container** (§4.3) — removes `sudo` from every data operation.
 - **Real auth** if you ever add a second user; basic auth has no logout or session expiry.
 - **A healthcheck** in the prod compose so Docker restarts a hung app rather than serving 502s from the boat.
