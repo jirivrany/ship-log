@@ -1,0 +1,169 @@
+{% extends "base.html" %}
+{% block title %}Ship Log — Weather Analysis{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h1 class="h3 mb-0">Weather Analysis</h1>
+  <button class="btn btn-light border" data-bs-toggle="collapse" data-bs-target="#locations-panel">
+    Manage locations
+  </button>
+</div>
+
+{% if error %}
+<div class="alert alert-danger">{{ error }}</div>
+{% endif %}
+
+<div class="collapse mb-4" id="locations-panel">
+  <div class="card card-body">
+    <div id="location-manager">
+      {% include "weather_analysis/partials/location_list.html" %}
+    </div>
+  </div>
+</div>
+
+<form action="/weather-analysis/run" method="post" class="card card-body mb-4"
+      id="analysis-form">
+  <div class="mb-3">
+    <label class="form-label fw-semibold">Locations</label>
+    {% if grouped_locations %}
+    <div class="row g-3">
+      {% for region, locations in grouped_locations %}
+      <div class="col-md-4">
+        <div class="text-muted small text-uppercase fw-semibold mb-1">{{ region }}</div>
+        {% for location in locations %}
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" name="location_ids"
+                 value="{{ location.id }}" id="loc-{{ location.id }}"
+                 {% if selected_ids and location.id in selected_ids %}checked{% endif %}>
+          <label class="form-check-label" for="loc-{{ location.id }}">
+            {{ location.name }}
+            <span class="coords d-block">
+              {{ location.latitude }}, {{ location.longitude }}
+              {% if location.resolved_lat is not none %}
+                → cell {{ location.resolved_lat }}, {{ location.resolved_lon }}
+              {% endif %}
+            </span>
+          </label>
+        </div>
+        {% endfor %}
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-muted mb-0">No locations configured. Add one above.</p>
+    {% endif %}
+  </div>
+
+  {% set months = [(1,"Jan"),(2,"Feb"),(3,"Mar"),(4,"Apr"),(5,"May"),(6,"Jun"),
+                   (7,"Jul"),(8,"Aug"),(9,"Sep"),(10,"Oct"),(11,"Nov"),(12,"Dec")] %}
+  <div class="row g-3 mb-3">
+    <div class="col-auto">
+      <label class="form-label fw-semibold">Window start</label>
+      <div class="d-flex gap-1">
+        <input type="number" class="form-control" style="width:4.5rem" name="start_day"
+               min="1" max="31" value="{{ defaults.start_day }}" aria-label="Start day">
+        <select class="form-select" style="width:6rem" name="start_month" aria-label="Start month">
+          {% for number, label in months %}
+          <option value="{{ number }}" {% if number == defaults.start_month %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+    <div class="col-auto">
+      <label class="form-label fw-semibold">Window end</label>
+      <div class="d-flex gap-1">
+        <input type="number" class="form-control" style="width:4.5rem" name="end_day"
+               min="1" max="31" value="{{ defaults.end_day }}" aria-label="End day">
+        <select class="form-select" style="width:6rem" name="end_month" aria-label="End month">
+          {% for number, label in months %}
+          <option value="{{ number }}" {% if number == defaults.end_month %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-text">an end before the start crosses New Year</div>
+    </div>
+    <div class="col-auto">
+      <label class="form-label fw-semibold">Years</label>
+      <div class="d-flex gap-1 align-items-center">
+        <input type="number" class="form-control" style="width:6rem" name="first_year"
+               min="1940" max="{{ current_year }}" value="{{ defaults.first_year }}"
+               aria-label="First year">
+        <span class="text-muted">–</span>
+        <input type="number" class="form-control" style="width:6rem" name="last_year"
+               min="1940" max="{{ current_year }}" value="{{ defaults.last_year }}"
+               aria-label="Last year">
+      </div>
+      <div class="form-text">{{ current_year }} is incomplete and not preselected</div>
+    </div>
+  </div>
+
+  <div class="mb-3">
+    <a class="small text-decoration-none" data-bs-toggle="collapse" href="#thresholds-panel">
+      Classification thresholds ▾
+    </a>
+    <div class="collapse mt-2" id="thresholds-panel">
+      <div class="row g-2">
+        {% for field, label in [
+          ("yellow_wind_kn", "Yellow wind (kn)"), ("yellow_rain_mm", "Yellow rain (mm)"),
+          ("red_wind_kn", "Red wind (kn)"), ("red_gust_kn", "Red gust (kn)"),
+          ("red_rain_mm", "Red rain (mm)"),
+          ("lost_wind_kn", "Lost-day wind (kn)"), ("lost_rain_mm", "Lost-day rain (mm)")] %}
+        <div class="col-auto">
+          <label class="form-label small mb-0">{{ label }}</label>
+          <input type="number" step="0.1" class="form-control form-control-sm"
+                 style="width:7rem" name="{{ field }}"
+                 value="{{ thresholds.as_dict()[field] }}">
+        </div>
+        {% endfor %}
+      </div>
+      <div class="form-text">
+        Yellow limits are inclusive; red needs a value above its limit.
+      </div>
+    </div>
+  </div>
+
+  {# A cold run fetches one request per location and year, so it can take
+     tens of seconds. The button doubles as the progress indicator; the plain
+     form POST still works if the enhancing script does not run. #}
+  <div class="d-flex align-items-center gap-3">
+    <button type="submit" class="btn btn-primary" id="analyze-button">
+      <span class="spinner-border spinner-border-sm me-1 d-none"
+            id="analyze-spinner" role="status" aria-hidden="true"></span>
+      <span id="analyze-label">Analyze</span>
+    </button>
+    <span class="text-muted small d-none" id="analyze-status" role="status" aria-live="polite">
+      Fetching historical weather — this can take a minute the first time.
+      Already-analyzed years are reused, so repeats are fast.
+    </span>
+  </div>
+</form>
+
+<p class="text-muted small">{{ attribution }}</p>
+
+{% if runs %}
+<h2 class="h5 mt-4 mb-2">Previous analyses</h2>
+<div class="list-group mb-4">
+  {% for run, locations in runs %}
+  <div class="list-group-item d-flex justify-content-between align-items-center">
+    <a href="/weather-analysis/runs/{{ run.id }}" class="text-decoration-none">
+      {# Locations first: several runs often share a window and year range,
+         so the places compared are what distinguishes them. #}
+      <span class="fw-semibold">{{ locations }}</span>
+      <span class="text-muted small d-block">
+        {{ describe(run.start_month, run.start_day, run.end_month, run.end_day) }},
+        {{ run.first_year }}–{{ run.last_year }} ·
+        {{ run.created_at.strftime("%Y-%m-%d %H:%M") }} · {{ run.provider }}/{{ run.model }}
+      </span>
+    </a>
+    <form action="/weather-analysis/runs/{{ run.id }}/delete" method="post" class="m-0">
+      <button class="btn btn-sm btn-light border text-danger" type="submit">Delete</button>
+    </form>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/weather_analysis.js"></script>
+{% endblock %}

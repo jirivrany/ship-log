@@ -1,0 +1,197 @@
+{% extends "base.html" %}
+{% block title %}Ship Log — Weather Analysis {{ window_label }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-start mb-3">
+  <div>
+    <h1 class="h3 mb-1">{{ window_label }}</h1>
+    <div class="text-muted">
+      {{ run.first_year }}–{{ run.last_year }} ·
+      {{ ranked | length }} location{{ 's' if ranked | length != 1 }} ·
+      {{ run.provider }}/{{ run.model }}
+    </div>
+  </div>
+  <a href="/weather-analysis" class="btn btn-light border">New analysis</a>
+</div>
+
+{% if result.statement %}
+<div class="alert alert-primary">{{ result.statement }}</div>
+{% endif %}
+
+{# 3. Sortable per-location comparison (PRD §9.3) #}
+<h2 class="h5 mb-2">Comparison</h2>
+<div class="table-responsive mb-4">
+  <table class="table table-sm table-hover align-middle sortable-table">
+    <thead class="table-light">
+      <tr>
+        <th data-sort="text">Location</th>
+        <th data-sort="text">Region</th>
+        <th data-sort="number" class="text-end">Green %</th>
+        <th data-sort="number" class="text-end">Yellow %</th>
+        <th data-sort="number" class="text-end">Red %</th>
+        <th data-sort="number" class="text-end">Lost-day probability</th>
+        <th data-sort="number" class="text-end">Mean lost days</th>
+        <th data-sort="number" class="text-end">Median max wind</th>
+        <th data-sort="number" class="text-end">Median rain</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for summary in ranked %}
+      <tr>
+        <td class="fw-semibold">{{ summary.name }}</td>
+        <td class="text-muted small">{{ summary.region }}</td>
+        <td class="text-end">{{ summary.green_pct }}%</td>
+        <td class="text-end">{{ summary.yellow_pct }}%</td>
+        <td class="text-end">{{ summary.red_pct }}%</td>
+        <td class="text-end">{{ summary.lost_day_probability }}%</td>
+        <td class="text-end">{{ summary.mean_lost_days }}</td>
+        <td class="text-end">
+          {{ summary.median_max_wind_kn if summary.median_max_wind_kn is not none else "—" }} kn
+        </td>
+        <td class="text-end">
+          {{ summary.median_rain_mm if summary.median_rain_mm is not none else "—" }} mm
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{# 4-7. Per-location detail: charts beside their equivalent tables #}
+{% for summary in ranked %}
+{% set detail = per_location[summary.location_key] %}
+<div class="card mb-4">
+  <div class="card-body">
+    <div class="d-flex justify-content-between align-items-baseline mb-3">
+      <h2 class="h5 mb-0">{{ summary.name }}</h2>
+      <span class="text-muted small">
+        {{ summary.days }} days over {{ summary.windows }} window{{ 's' if summary.windows != 1 }}
+        {% set snapshot = snapshots[summary.location_key] %}
+        · {{ snapshot.latitude }}, {{ snapshot.longitude }}
+        {% if snapshot.resolved_lat is not none %}
+          → cell {{ snapshot.resolved_lat }}, {{ snapshot.resolved_lon }}
+        {% endif %}
+      </span>
+    </div>
+
+    <div class="row g-4">
+      <div class="col-lg-4">
+        {% include "weather_analysis/partials/wind_rose.html" %}
+      </div>
+      <div class="col-lg-4">
+        <h3 class="h6 text-muted">Max wind distribution</h3>
+        {% with bars = detail.wind_bars, unit = "kn" %}
+          {% include "weather_analysis/partials/bar_chart.html" %}
+        {% endwith %}
+      </div>
+      <div class="col-lg-4">
+        <h3 class="h6 text-muted">Daily rainfall</h3>
+        {% with bars = detail.rain_bars, unit = "mm" %}
+          {% include "weather_analysis/partials/bar_chart.html" %}
+        {% endwith %}
+      </div>
+    </div>
+
+    <div class="row g-4 mt-1">
+      <div class="col-lg-6">
+        <h3 class="h6 text-muted">Sailing ratings</h3>
+        {% with bars = detail.rating_bars, unit = "days" %}
+          {% include "weather_analysis/partials/bar_chart.html" %}
+        {% endwith %}
+      </div>
+      <div class="col-lg-6">
+        <h3 class="h6 text-muted">Rain &amp; lost days</h3>
+        {% set rain = summary.statistics.rainfall_statistics %}
+        {% set lost = summary.statistics.lost_day_statistics %}
+        <table class="table table-sm mb-0">
+          <tbody>
+            <tr><td>Rainy days</td>
+                <td class="text-end">{{ rain.rainy_days }} ({{ rain.rainy_day_percent }}%)</td></tr>
+            <tr><td>Heavy-rain days</td>
+                <td class="text-end">{{ rain.heavy_rain_days }} ({{ rain.heavy_rain_day_percent }}%)</td></tr>
+            <tr><td>Consecutive-rain events</td>
+                <td class="text-end">{{ rain.consecutive_rain_events }}</td></tr>
+            <tr><td>Longest rain streak</td>
+                <td class="text-end">{{ rain.longest_consecutive_rain_days }} days</td></tr>
+            <tr><td>Lost days total</td>
+                <td class="text-end">{{ lost.total_lost_days }}</td></tr>
+            <tr><td>Mean lost days per window</td>
+                <td class="text-end">{{ lost.mean_lost_days_per_window }}</td></tr>
+            <tr class="fw-semibold"><td>Window with ≥1 lost day</td>
+                <td class="text-end">{{ lost.probability_window_has_lost_day }}%</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endfor %}
+
+{# 6. Daily summaries, filterable by location and year (PRD §9.6) #}
+<h2 class="h5 mb-2">Daily summaries</h2>
+<div class="d-flex gap-2 mb-2">
+  <select class="form-select form-select-sm" style="width:auto" id="filter-location">
+    <option value="">All locations</option>
+    {% for summary in ranked %}
+    <option value="{{ summary.location_key }}">{{ summary.name }}</option>
+    {% endfor %}
+  </select>
+  <select class="form-select form-select-sm" style="width:auto" id="filter-year">
+    <option value="">All years</option>
+    {% for year in years %}<option value="{{ year }}">{{ year }}</option>{% endfor %}
+  </select>
+</div>
+<div class="table-responsive mb-4">
+  <table class="table table-sm align-middle" id="daily-table">
+    <thead class="table-light">
+      <tr>
+        <th>Date</th><th>Location</th>
+        <th class="text-end">Avg wind</th><th class="text-end">Max wind</th>
+        <th class="text-end">Max gust</th><th class="text-end">Rain</th>
+        <th>Direction</th><th>Rating</th><th>Lost</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for summary in ranked %}
+        {% for day in per_location[summary.location_key].days %}
+        <tr data-location="{{ summary.location_key }}" data-year="{{ day.window_year }}">
+          <td>{{ day.local_date }}</td>
+          <td>{{ summary.name }}</td>
+          <td class="text-end">{{ day.avg_wind_kn if day.avg_wind_kn is not none else "—" }}</td>
+          <td class="text-end">{{ day.max_wind_kn if day.max_wind_kn is not none else "—" }}</td>
+          <td class="text-end">{{ day.max_gust_kn if day.max_gust_kn is not none else "—" }}</td>
+          <td class="text-end">{{ day.rain_total_mm if day.rain_total_mm is not none else "—" }}</td>
+          <td>{{ day.dominant_direction or "—" }}</td>
+          <td>
+            {% if day.sailing_rating %}
+            <span class="badge rating-badge rating-badge--{{ day.sailing_rating.value }}">
+              {{ day.sailing_rating.value }}
+            </span>
+            {% else %}—{% endif %}
+          </td>
+          <td>{{ "yes" if day.lost_day else "" }}</td>
+        </tr>
+        {% endfor %}
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{# 8. Downloads (PRD §9.8) #}
+<h2 class="h5 mb-2">Downloads</h2>
+<div class="d-flex gap-2 mb-4">
+  <a class="btn btn-light border" href="/weather-analysis/runs/{{ run.id }}/export/daily.csv">Daily CSV</a>
+  <a class="btn btn-light border" href="/weather-analysis/runs/{{ run.id }}/export/hourly.csv">Hourly CSV</a>
+  <a class="btn btn-light border" href="/weather-analysis/runs/{{ run.id }}/export/summary.json">Summary JSON</a>
+</div>
+
+<p class="text-muted small">
+  {{ attribution }}
+  Thresholds used:
+  {% for field, value in result.thresholds.as_dict().items() %}{{ field }}={{ value }}{{ ", " if not loop.last }}{% endfor %}.
+</p>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/weather_analysis.js"></script>
+{% endblock %}

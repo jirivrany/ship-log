@@ -1,6 +1,7 @@
 from datetime import datetime
 from enum import Enum
 from typing import Optional
+from sqlalchemy import Index
 from sqlmodel import Field, Relationship, SQLModel
 
 
@@ -154,3 +155,122 @@ class LogEntry(SQLModel, table=True):
     notes: Optional[str] = None
 
     leg: Optional[Leg] = Relationship(back_populates="log_entries")
+
+
+# ---------------------------------------------------------------------------
+# Historical weather analysis (PRD: features/weather_analysis.md)
+#
+# Deliberately shares nothing with Voyage/Leg/LogEntry: the analyzer is a
+# standalone planning tool that neither reads nor writes voyage data.
+# ---------------------------------------------------------------------------
+
+
+class SailingRating(str, Enum):
+    """Daily suitability class. Red beats yellow beats green (PRD §8).
+
+    Member names deliberately equal their values: SQLModel persists enums by
+    member *name*, so this keeps the stored token readable and identical to
+    what exports and templates emit. (Contrast NavArea, whose name/value
+    differ, which is why it must be read via `.value`.)
+    """
+    green = "green"
+    yellow = "yellow"
+    red = "red"
+
+
+class AnalysisLocation(SQLModel, table=True):
+    """A candidate destination: a representative sea point, not a marina."""
+    id: Optional[int] = Field(default=None, primary_key=True)
+    key: str = Field(index=True, unique=True)  # slug, e.g. "murtersko_more"
+    region: str                                # picker grouping, e.g. "Middle Adriatic"
+    name: str                                  # display name, e.g. "Murtersko More"
+    latitude: float                            # as configured by the user
+    longitude: float
+    timezone: str                              # IANA name, drives daily grouping
+
+    # Sea-cell probe results (scripts/verify_analysis_locations.py or the add
+    # form). NULL verified_at means "not probed yet" — selectable, but flagged.
+    resolved_lat: Optional[float] = None       # cell the provider actually serves
+    resolved_lon: Optional[float] = None
+    verified_at: Optional[datetime] = None
+
+    # Soft removal: runs keep their location snapshots, so a removed location
+    # must never be deleted outright (PRD §5).
+    active: bool = Field(default=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class AnalysisRun(SQLModel, table=True):
+    """One asked question: these locations, this window, these thresholds.
+
+    The observations themselves live in HourlyObservationCache and are shared
+    across runs; a run stores only its metadata and derived daily summaries.
+    """
+    id: Optional[int] = Field(default=None, primary_key=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+    # Recurring annual window; end before start means the end falls in year+1.
+    start_month: int
+    start_day: int
+    end_month: int
+    end_day: int
+    first_year: int
+    last_year: int
+
+    provider: str = Field(default="open-meteo")
+    model: str = Field(default="era5")
+
+    # Frozen at run time so a later threshold or location edit cannot silently
+    # change what an existing result page and its exports mean.
+    thresholds_json: str
+    location_snapshots_json: str
+
+    status: str = Field(default="ok")          # "ok" | "error"
+    error_message: Optional[str] = None
+
+
+class DailySummary(SQLModel, table=True):
+    """One local calendar day at one location, aggregated from hourly data."""
+    id: Optional[int] = Field(default=None, primary_key=True)
+    run_id: int = Field(foreign_key="analysisrun.id", index=True)
+    location_key: str = Field(index=True)
+    local_date: str                            # ISO date YYYY-MM-DD, location-local
+    window_year: int                           # year containing the window start
+
+    avg_wind_kn: Optional[float] = None
+    max_wind_kn: Optional[float] = None
+    max_gust_kn: Optional[float] = None
+    rain_total_mm: Optional[float] = None
+    dominant_direction: Optional[str] = None   # eight-point sector
+    sailing_rating: Optional[SailingRating] = None
+    lost_day: bool = Field(default=False)
+
+
+class HourlyObservationCache(SQLModel, table=True):
+    """Normalized provider data for one location-day.
+
+    ERA5 is immutable, so a cached day is valid forever and a repeated request
+    must reuse it instead of calling the provider (PRD §7). Keyed by provider
+    and model too, so a future Copernicus/CERRA adapter fills its own rows.
+    """
+    # One composite index serves the only lookup there is and enforces the
+    # uniqueness the cache relies on: one row per provider-model-location-day.
+    __table_args__ = (
+        Index(
+            "ix_hourly_cache_key",
+            "provider", "model", "location_key", "local_date",
+            unique=True,
+        ),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    provider: str
+    model: str
+    location_key: str
+    local_date: str                            # ISO date, location-local
+
+    payload_json: str                          # list of normalized hourly rows
+    resolved_lat: Optional[float] = None
+    resolved_lon: Optional[float] = None
+    retrieved_at: datetime = Field(default_factory=datetime.utcnow)

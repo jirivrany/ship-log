@@ -95,8 +95,19 @@ def migrate_schema(target_engine) -> None:
 
 def init_db():
     os.makedirs("/app/data", exist_ok=True)
+
+    # Import for the side effect of registering every table on SQLModel's
+    # metadata: create_all only builds what has been imported by then.
+    import app.models  # noqa: F401
+
     migrate_schema(engine)
     SQLModel.metadata.create_all(engine)
+
+    # Preseed the weather-analysis locations. Idempotent and offline, so a
+    # restart neither duplicates rows nor blocks boot on a provider outage.
+    from app.analysis.seed import seed_locations
+    with Session(engine) as session:
+        seed_locations(session)
 
 
 def get_session():

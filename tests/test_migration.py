@@ -127,3 +127,24 @@ def test_fresh_db_untouched(tmp_path):
     engine = create_engine(f"sqlite:///{tmp_path}/fresh.db")
     migrate_schema(engine)  # no leg table yet -> no-op, create_all handles it
     assert _columns(engine) == set()
+
+
+def test_weather_analysis_tables_added_to_existing_db(tmp_path):
+    """The analysis tables are new, so create_all builds them on a live DB
+    with no ALTER logic — and touches nothing that is already there."""
+    from sqlmodel import SQLModel
+
+    import app.models  # noqa: F401  (registers the tables on the metadata)
+
+    engine = _old_db_engine(tmp_path)
+    migrate_schema(engine)
+    SQLModel.metadata.create_all(engine)
+
+    with engine.connect() as conn:
+        tables = {r[0] for r in conn.exec_driver_sql(
+            "SELECT name FROM sqlite_master WHERE type='table'"
+        ).fetchall()}
+        leg_count = conn.exec_driver_sql("SELECT COUNT(*) FROM leg").fetchone()[0]
+    assert {"analysislocation", "analysisrun",
+            "dailysummary", "hourlyobservationcache"} <= tables
+    assert leg_count == 2  # pre-existing voyage data survives untouched

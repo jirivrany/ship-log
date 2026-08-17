@@ -1,0 +1,20 @@
+{# Horizontal bars built from Bootstrap utilities — the label and the count are
+   plain text, so the chart is its own summary table (PRD §9). #}
+<table class="table table-sm mb-0">
+  <tbody>
+    {% for bar in bars %}
+    <tr>
+      <td class="py-1 text-nowrap" style="width:5rem">{{ bar.label }}</td>
+      <td class="py-1" style="width:100%">
+        <div class="bg-light rounded" style="height:14px">
+          <div class="rounded" style="height:14px; width:{{ bar.width_pct }}%;
+               background:{{ bar.color or '#0d6efd' }}"></div>
+        </div>
+      </td>
+      <td class="py-1 text-end text-nowrap" style="width:6rem">
+        {{ bar.days }} <span class="text-muted">({{ bar.percent }}%)</span>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>

@@ -1,0 +1,110 @@
+{# Location manager (PRD §5): add, edit, remove. Swapped in place by HTMX. #}
+<div class="d-flex justify-content-between align-items-center mb-2">
+  <h2 class="h6 mb-0">Locations</h2>
+  <span class="text-muted small">
+    Coordinates are sea-analysis points you choose — not marina positions.
+  </span>
+</div>
+
+{% if errors %}
+<div class="alert alert-danger py-2">
+  <ul class="mb-0 ps-3">
+    {% for field, message in errors.items() %}<li>{{ message }}</li>{% endfor %}
+  </ul>
+</div>
+{% endif %}
+
+<div class="table-responsive">
+  <table class="table table-sm align-middle mb-2">
+    <thead>
+      <tr class="text-muted small">
+        <th>Region</th><th>Name</th><th>Latitude</th><th>Longitude</th>
+        <th>Timezone</th><th>Resolved cell</th><th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for region, locations in grouped_locations %}
+        {% for location in locations %}
+        <tr>
+          {% if editing_id == location.id %}
+          <td colspan="7">
+            <form hx-post="/weather-analysis/locations/{{ location.id }}"
+                  hx-target="#location-manager" class="row g-1">
+              <div class="col"><input class="form-control form-control-sm" name="region"
+                     value="{{ submitted.region if submitted else location.region }}"></div>
+              <div class="col"><input class="form-control form-control-sm" name="name"
+                     value="{{ submitted.name if submitted else location.name }}"></div>
+              <div class="col"><input class="form-control form-control-sm" name="latitude"
+                     value="{{ submitted.latitude if submitted else location.latitude }}"></div>
+              <div class="col"><input class="form-control form-control-sm" name="longitude"
+                     value="{{ submitted.longitude if submitted else location.longitude }}"></div>
+              <div class="col"><input class="form-control form-control-sm" name="timezone"
+                     value="{{ submitted.timezone if submitted else location.timezone }}"></div>
+              <div class="col-auto">
+                <button class="btn btn-sm btn-primary" type="submit">Save</button>
+                <button class="btn btn-sm btn-light border" type="button"
+                        hx-get="/weather-analysis/locations"
+                        hx-target="#location-manager">Cancel</button>
+              </div>
+            </form>
+          </td>
+          {% else %}
+          <td class="text-muted small">{{ location.region }}</td>
+          <td>{{ location.name }}</td>
+          <td class="coords">{{ location.latitude }}</td>
+          <td class="coords">{{ location.longitude }}</td>
+          <td class="text-muted small">{{ location.timezone }}</td>
+          <td class="coords">
+            {% if location.resolved_lat is not none %}
+              {{ location.resolved_lat }}, {{ location.resolved_lon }}
+            {% else %}
+              <span class="text-muted">—</span>
+            {% endif %}
+          </td>
+          <td class="text-end">
+            <button class="btn btn-sm btn-light border"
+                    hx-get="/weather-analysis/locations?editing_id={{ location.id }}"
+                    hx-target="#location-manager">Edit</button>
+            <button class="btn btn-sm btn-light border text-danger"
+                    hx-delete="/weather-analysis/locations/{{ location.id }}"
+                    hx-target="#location-manager">Remove</button>
+          </td>
+          {% endif %}
+        </tr>
+        {% endfor %}
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<form hx-post="/weather-analysis/locations" hx-target="#location-manager"
+      class="row g-1 align-items-end">
+  <div class="col">
+    <label class="form-label small mb-0">Region</label>
+    <input class="form-control form-control-sm" name="region" placeholder="Middle Adriatic"
+           value="{{ submitted.region if submitted and not editing_id else '' }}">
+  </div>
+  <div class="col">
+    <label class="form-label small mb-0">Name</label>
+    <input class="form-control form-control-sm" name="name" placeholder="Murtersko More"
+           value="{{ submitted.name if submitted and not editing_id else '' }}">
+  </div>
+  <div class="col">
+    <label class="form-label small mb-0">Latitude</label>
+    <input class="form-control form-control-sm" name="latitude" placeholder="43.82"
+           value="{{ submitted.latitude if submitted and not editing_id and submitted.latitude is not none else '' }}">
+  </div>
+  <div class="col">
+    <label class="form-label small mb-0">Longitude</label>
+    <input class="form-control form-control-sm" name="longitude" placeholder="15.60"
+           value="{{ submitted.longitude if submitted and not editing_id and submitted.longitude is not none else '' }}">
+  </div>
+  <div class="col">
+    <label class="form-label small mb-0">Timezone</label>
+    <input class="form-control form-control-sm" name="timezone" placeholder="Europe/Zagreb"
+           value="{{ submitted.timezone if submitted and not editing_id else '' }}">
+  </div>
+  <div class="col-auto">
+    <button class="btn btn-sm btn-primary" type="submit">Add</button>
+  </div>
+</form>
