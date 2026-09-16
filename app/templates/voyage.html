@@ -209,11 +209,7 @@
     '#0891b2','#be185d','#65a30d','#ea580c','#6366f1',
   ];
 
-  const map = L.map('voyage-map');
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '© OpenStreetMap contributors',
-    maxZoom: 18,
-  }).addTo(map);
+  const map = ShipLogMap.create('voyage-map');
 
   const allLatLons = [];
   {% for leg in legs %}
@@ -240,9 +236,7 @@
   }
   {% endfor %}
 
-  if (allLatLons.length > 0) {
-    map.fitBounds(L.latLngBounds(allLatLons), { padding: [20, 20] });
-  }
+  ShipLogMap.fitToLatLons(map, allLatLons);
 </script>
 {% endif %}
 {% endblock %}

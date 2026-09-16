@@ -210,11 +210,7 @@
     {% endfor %}
   ];
 
-  const map = L.map('map');
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '© OpenStreetMap contributors',
-    maxZoom: 18,
-  }).addTo(map);
+  const map = ShipLogMap.create('map');
 
   const latLons = trackPoints.map(p => [p.lat, p.lon]);
   let polyline = null;
@@ -257,9 +253,7 @@
     .filter(e => e.lat !== null && e.lon !== null)
     .map(e => [e.lat, e.lon]);
   const boundsLatLons = latLons.length > 0 ? latLons : positionedEntryLatLons;
-  if (boundsLatLons.length > 0) {
-    map.fitBounds(L.latLngBounds(boundsLatLons), { padding: [20, 20] });
-  } else {
+  if (!ShipLogMap.fitToLatLons(map, boundsLatLons)) {
     map.setView([43.5, 16.0], 8);  // default view: Adriatic, this app's usual cruising ground
   }
 
