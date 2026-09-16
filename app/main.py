@@ -6,7 +6,7 @@ from fastapi.templating import Jinja2Templates
 
 from app.database import init_db
 from app.routers import (
-    voyages, legs, log_entries, profile, strava, weather_analysis,
+    voyages, legs, log_entries, passage, profile, strava, weather_analysis,
 )
 
 
@@ -26,4 +26,5 @@ app.include_router(legs.router)
 app.include_router(log_entries.router)
 app.include_router(profile.router)
 app.include_router(strava.router)
+app.include_router(passage.router)
 app.include_router(weather_analysis.router)

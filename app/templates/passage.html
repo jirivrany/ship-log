@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}Ship Log — Passage Planner{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1 class="h3 mb-0">Passage Planner</h1>
+  <div class="d-flex gap-2">
+    <button type="button" class="btn btn-light border" id="undo-waypoint" disabled>
+      Undo point
+    </button>
+    <button type="button" class="btn btn-light border" id="clear-route" disabled>
+      Clear route
+    </button>
+  </div>
+</div>
+
+<p class="text-muted small">
+  Click the map to drop waypoints. Drag a marker to adjust it, click a marker
+  to remove it. Courses are rhumb lines — a constant heading for the whole leg.
+</p>
+
+<div id="passage-map"></div>
+
+<div id="passage-empty" class="alert alert-light border text-muted">
+  Click two points on the map to measure a passage.
+</div>
+
+<div id="passage-result" class="d-none">
+  <div class="card mb-4">
+    <div class="table-responsive">
+      <table class="table table-sm mb-0 align-middle">
+        <thead class="table-light">
+          <tr>
+            <th>Leg</th>
+            <th class="text-end">True</th>
+            <th class="text-end">Magnetic</th>
+            <th class="text-end">Distance</th>
+            <th class="text-end">Cumulative</th>
+            <th>Alter course</th>
+          </tr>
+        </thead>
+        <tbody id="passage-rows"></tbody>
+        <tfoot class="table-light fw-semibold">
+          <tr>
+            <td>Total</td>
+            <td></td>
+            <td></td>
+            <td class="text-end" id="passage-total"></td>
+            <td></td>
+            <td></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  </div>
+
+  <p class="text-muted small" id="variation-note"></p>
+
+  <div class="row g-3 mb-4">
+    {% for speed in eta_speeds %}
+    <div class="col-4 col-md-2">
+      <div class="card card-body py-2 text-center">
+        <div class="text-muted small">at {{ "%.0f"|format(speed) }} kn</div>
+        <div class="fw-semibold" data-eta-speed="{{ speed }}">—</div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<p class="text-muted small">{{ attribution }}</p>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const ETA_SPEEDS = {{ eta_speeds | tojson }};
+</script>
+<script src="/static/js/passage.js"></script>
+{% endblock %}

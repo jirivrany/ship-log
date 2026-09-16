@@ -11,3 +11,4 @@ httpx==0.27.2
 weasyprint==69.0
 pillow==12.3.0
 pypdf==6.14.2
+pygeomag==1.1.0

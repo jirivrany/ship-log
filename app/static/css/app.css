@@ -1,11 +1,12 @@
 /* Maps */
-#map, #voyage-map {
+#map, #voyage-map, #passage-map {
   height: 420px;
   border-radius: 8px;
   border: 1px solid #dee2e6;
   margin-bottom: 24px;
 }
 #voyage-map { height: 480px; }
+#passage-map { height: 560px; cursor: crosshair; }
 
 /* Log table — source color left-border */
 .log-row--lap td:first-child           { border-left: 3px solid #7c3aed; }
