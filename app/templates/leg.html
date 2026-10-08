@@ -92,6 +92,82 @@
   {% endif %}
 </div>
 
+<div class="card p-3 mb-4">
+  <div class="d-flex align-items-center gap-2 mb-3">
+    <h2 class="h6 fw-semibold mb-0">Passage plan</h2>
+    {% if passage_plan %}
+    <span class="text-muted small">{{ passage_plan.name }}</span>
+    <div class="ms-auto d-flex gap-2">
+      <a href="/passage?plan={{ passage_plan.id }}&leg={{ leg.id }}"
+         class="btn btn-light border btn-sm">Edit in planner</a>
+      <form method="post" action="/legs/{{ leg.id }}/passage-plan" class="mb-0">
+        <input type="hidden" name="plan_id" value="">
+        <button type="submit" class="btn btn-light border btn-sm">Detach</button>
+      </form>
+    </div>
+    {% else %}
+    <div class="ms-auto d-flex gap-2 align-items-center">
+      {% if available_plans %}
+      <form method="post" action="/legs/{{ leg.id }}/passage-plan"
+            class="d-flex gap-2 mb-0">
+        <select name="plan_id" class="form-select form-select-sm">
+          {% for plan in available_plans %}
+          <option value="{{ plan.id }}">{{ plan.name }}</option>
+          {% endfor %}
+        </select>
+        <button type="submit" class="btn btn-secondary btn-sm">Attach</button>
+      </form>
+      {% endif %}
+      <a href="/passage?leg={{ leg.id }}" class="btn btn-light border btn-sm">
+        Plan a new passage
+      </a>
+    </div>
+    {% endif %}
+  </div>
+
+  {% if passage_legs %}
+  <div class="table-responsive">
+    <table class="table table-sm mb-0 align-middle">
+      <thead class="table-light">
+        <tr>
+          <th>Leg</th>
+          <th class="text-end">True</th>
+          <th class="text-end">Magnetic</th>
+          <th class="text-end">Distance</th>
+          <th class="text-end">Cumulative</th>
+          <th>Alter course</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for pl in passage_legs %}
+        <tr>
+          <td>{{ pl.start.name or pl.index }} → {{ pl.end.name or (pl.index + 1) }}</td>
+          <td class="text-end">{{ "%.0f"|format(pl.true_course) }}°</td>
+          <td class="text-end">
+            {%- if pl.magnetic_course is not none -%}
+              {{ "%.0f"|format(pl.magnetic_course) }}°
+            {%- else -%}—{%- endif -%}
+          </td>
+          <td class="text-end">{{ "%.1f"|format(pl.distance_nm) }} NM</td>
+          <td class="text-end">{{ "%.1f"|format(pl.cumulative_nm) }} NM</td>
+          <td>
+            {%- if pl.alter_course is not none -%}
+              {{ "%.0f"|format(pl.alter_course|abs) }}° to
+              {{ "starboard" if pl.alter_course > 0 else "port" }}
+            {%- endif -%}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% elif not passage_plan %}
+  <p class="text-muted small mb-0">
+    No plan attached. Attach a saved one, or plan a new passage and come back.
+  </p>
+  {% endif %}
+</div>
+
 {% if local_entries %}
 <div class="card p-3 mb-4">
   <h2 class="h6 fw-semibold mb-3">Summary</h2>
@@ -212,6 +288,16 @@
 
   const map = ShipLogMap.create('map');
 
+  // The planned route, if one is attached: a second line beside the sailed
+  // track. Nothing is computed from the pair — under sail the actual course
+  // depends on the wind, so a plan/actual distance would measure the weather.
+  const plannedRoute = {{ planned_route | tojson }};
+  if (plannedRoute.length > 1) {
+    L.polyline(plannedRoute, {
+      color: '#7c3aed', weight: 3, opacity: 0.8, dashArray: '8 6',
+    }).bindTooltip('Planned route', { sticky: true }).addTo(map);
+  }
+
   const latLons = trackPoints.map(p => [p.lat, p.lon]);
   let polyline = null;
   if (latLons.length > 0) {
@@ -252,7 +338,8 @@
   const positionedEntryLatLons = logEntries
     .filter(e => e.lat !== null && e.lon !== null)
     .map(e => [e.lat, e.lon]);
-  const boundsLatLons = latLons.length > 0 ? latLons : positionedEntryLatLons;
+  const boundsLatLons = latLons.length > 0 ? latLons
+    : (positionedEntryLatLons.length > 0 ? positionedEntryLatLons : plannedRoute);
   if (!ShipLogMap.fitToLatLons(map, boundsLatLons)) {
     map.setView([43.5, 16.0], 8);  // default view: Adriatic, this app's usual cruising ground
   }

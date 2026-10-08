@@ -12,6 +12,10 @@ from unittest.mock import patch
 import pytest
 from fastapi.testclient import TestClient
 
+from sqlmodel import SQLModel, Session, create_engine
+from sqlalchemy.pool import StaticPool
+
+from app.database import get_session
 from app.main import app
 from app.routers.passage import ETA_SPEEDS
 from app.passage import (
@@ -24,10 +28,23 @@ from app.passage import (
 
 
 @pytest.fixture()
-def client():
+def db_session():
+    """The planner page lists saved plans, so it needs a session."""
+    engine = create_engine("sqlite:///:memory:",
+                           connect_args={"check_same_thread": False},
+                           poolclass=StaticPool)
+    SQLModel.metadata.create_all(engine)
+    with Session(engine) as session:
+        yield session
+
+
+@pytest.fixture()
+def client(db_session):
+    app.dependency_overrides[get_session] = lambda: db_session
     with patch("app.main.init_db"), patch("app.main.os.makedirs"):
         with TestClient(app, raise_server_exceptions=False) as c:
             yield c
+    app.dependency_overrides.clear()
 
 
 # --- rhumb line ---

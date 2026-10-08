@@ -13,7 +13,8 @@ from app.database import get_session
 from app.export import export_filename, leg_context, render_leg_pdf
 from app.forecast import fetch_leg_forecast, geocode_port
 from app.forecast_apply import apply_forecast
-from app.models import EntrySource, Leg, LogEntry, PropulsionType, Voyage
+from app.models import EntrySource, Leg, LogEntry, PassagePlan, PropulsionType, Voyage
+from app.passage_plans import computed_plan, list_plans, waypoints_of
 from app.processors import loader
 from app.processors.merge import build_log_entries
 from app.processors.notes import create_quick_note, filter_note_entries
@@ -380,6 +381,12 @@ def leg_detail(leg_id: int, request: Request, session: Session = Depends(get_ses
     track_points = _load_track_points(leg.track_path) if leg.track_path else []
     stats = _compute_leg_stats(entries)
 
+    # The planned route, drawn beside the sailed track. Courses are recomputed
+    # from the stored waypoints rather than read back, so the table at the helm
+    # always matches the line on the map.
+    plan = leg.passage_plan
+    planned_route = [[w.lat, w.lon] for w in waypoints_of(plan)] if plan else []
+
     note_entries = filter_note_entries(entries)
     local_notes = []
     for e in note_entries:
@@ -393,6 +400,10 @@ def leg_detail(leg_id: int, request: Request, session: Session = Depends(get_ses
         "local_entries": local_entries,
         "local_notes": local_notes,
         "track_points": track_points,
+        "passage_plan": plan,
+        "passage_legs": computed_plan(plan).legs if plan else [],
+        "planned_route": planned_route,
+        "available_plans": list_plans(session),
         "tz_name": leg.timezone,
         "stats": stats,
         "weather": weather_summary(entries),
@@ -739,3 +750,24 @@ def _load_track_points(track_path: str) -> list[dict]:
             "dist_nm": pt.raw_distance_nm if pt.raw_distance_nm is not None else pt.distance_nm,
         })
     return result
+
+
+@router.post("/legs/{leg_id}/passage-plan")
+def attach_passage_plan(leg_id: int, plan_id: str = Form(""),
+                        session: Session = Depends(get_session)):
+    """Attach a saved plan to a leg, or detach with an empty plan_id."""
+    leg = session.get(Leg, leg_id)
+    if not leg:
+        return HTMLResponse("Not found", status_code=404)
+
+    if plan_id:
+        plan = session.get(PassagePlan, int(plan_id))
+        if plan is None:
+            raise HTTPException(status_code=404, detail="Plan not found.")
+        leg.passage_plan_id = plan.id
+    else:
+        leg.passage_plan_id = None
+
+    session.add(leg)
+    session.commit()
+    return RedirectResponse(f"/legs/{leg.id}", status_code=303)

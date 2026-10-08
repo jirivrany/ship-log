@@ -24,6 +24,11 @@ app/
     legs.py                 leg creation (FIT upload, bare/"quick" leg, attach-fit),
                             leg detail, manual/quick-note entry creation
     log_entries.py          inline field PATCH / DELETE for a single entry
+    passage.py              passage planner: measuring + 20 NM offshore limit
+  passage.py             rhumb-line courses/distances, magnetic variation
+  coastline.py           OSM coastline fetch (Overpass) + on-disk cache
+  boundary.py            offshore-limit contour (distance field + marching squares)
+  limit_store.py         persisted computed limit areas
   processors/
     fit.py                  FIT metadata + manual lap parsing
     fit_track.py             FIT track parsing, turning-point detection
@@ -79,6 +84,63 @@ make verify-down  # stops it and wipes ./data-verify
 This runs as a separate Compose service (`verify`, in
 `docker-compose.verify.yml`) alongside — not instead of — the normal `app`
 service, so a running `docker compose up` dev server is unaffected.
+
+## Derived map data (not in the database)
+
+The passage planner caches two things on disk under `data/`. Neither is in
+SQLite: both are derived from OpenStreetMap, reconstructible at any time, and
+unrelated to voyages or legs, so they would cost a model and a migration for
+no benefit.
+
+| Path | What | Size | Worth keeping? |
+| --- | --- | --- | --- |
+| `data/offshore-limits.json` | Computed 20 NM limit contours, with the bounds each covers. Redrawn when the planner loads. | ~1 KB per area | Yes — small, and saves recomputing |
+| `data/coastline/*.json` | Raw Overpass answers, keyed by a hash of the bounding box. Lets an area be recomputed without re-querying Overpass. | 1–3 MB per area | No — pure cache |
+
+Both are covered by the existing `data/` entry in `.gitignore`.
+
+Deleting `data/coastline/` is safe: the contours still redraw, and only a
+*new* area needs Overpass again. Deleting `offshore-limits.json` loses the
+coverage but not the expensive part — recomputing reads the coastline cache
+and takes about a second instead of ~20.
+
+**Backups.** Back up `offshore-limits.json`; skip `data/coastline/`, which
+grows by 1–3 MB per area computed and regenerates itself.
+
+### Moving computed coverage to the server
+
+The contour file is plain coordinates with no absolute paths or machine state,
+so copying it across works:
+
+```bash
+scp data/offshore-limits.json shiplog@<server>:~/ship-log/data/
+```
+
+Copying as `shiplog` lands the file owned by `shiplog`, which is the user the
+app runs as, so no `chown` is needed. Two things to be aware of:
+
+- scp carries the *source* mode (600) to a file it creates, so a first copy is
+  readable only by `shiplog`. That is enough for the app, but not for another
+  account on the box.
+- Overwriting an existing file keeps the destination's own owner and mode, so
+  later copies inherit whatever is already there.
+
+If you copy as a different user — or via `sudo` into place — check the result,
+because the app runs as `shiplog` with a uid that differs from your laptop's
+(DEPLOYMENT.md §4.3). An unreadable store is not reported as an error: the
+planner just starts from no coverage.
+
+```bash
+ssh <server> 'ls -l ~/ship-log/data/offshore-limits.json'
+```
+
+Copying is one-way and last-write-wins: the whole set of areas lives in this
+one file, so transferring it **replaces** the server's coverage rather than
+merging. Copy server → laptop and you lose anything computed only on the
+server. To combine both, compute the missing areas on one machine instead.
+
+`data/coastline/` does not need copying. It only makes recomputation faster,
+and it is the bulky part.
 
 ## Notes on SQLite + schema changes
 

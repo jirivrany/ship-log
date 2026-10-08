@@ -6,7 +6,9 @@
   margin-bottom: 24px;
 }
 #voyage-map { height: 480px; }
-#passage-map { height: 560px; cursor: crosshair; }
+/* The planner is a map-first page: give it the viewport rather than the
+   fixed height the voyage and leg maps use under their tables. */
+#passage-map { height: calc(100vh - 260px); min-height: 560px; cursor: crosshair; }
 
 /* Log table — source color left-border */
 .log-row--lap td:first-child           { border-left: 3px solid #7c3aed; }
@@ -49,6 +51,30 @@
   cursor: pointer;
 }
 .popup-delete-btn:hover { background: #fee2e2; }
+
+/* Waypoint popup: same shape as the log-entry popup on the leg map, with a
+   name field above the actions. */
+.passage-wp-popup { min-width: 180px; }
+.popup-name-input {
+  margin-top: 6px;
+  width: 100%;
+  padding: 3px 6px;
+  font-size: 12px;
+  border: 1px solid #dee2e6;
+  border-radius: 4px;
+}
+.popup-name-btn {
+  margin-top: 6px;
+  width: 100%;
+  padding: 3px 0;
+  font-size: 12px;
+  color: #166534;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.popup-name-btn:hover { background: #dcfce7; }
 
 /* Weather analysis — a submitting form's button must stay enabled (a disabled
    submit is not sent) while refusing further clicks. */

@@ -11,15 +11,78 @@
     <button type="button" class="btn btn-light border" id="clear-route" disabled>
       Clear route
     </button>
+    <button type="button" class="btn btn-light border" id="show-limit">
+      <span class="spinner-border spinner-border-sm d-none" id="limit-spinner"
+            role="status" aria-hidden="true"></span>
+      <span id="limit-label">Compute 20 NM limit</span>
+    </button>
+    <div class="btn-group">
+      <input type="checkbox" class="btn-check" id="toggle-limit" autocomplete="off" checked>
+      <label class="btn btn-light border" for="toggle-limit" id="toggle-limit-label">
+        Limit shown
+      </label>
+      <button type="button" class="btn btn-light border" id="clear-limit" disabled>
+        Clear
+      </button>
+    </div>
   </div>
 </div>
 
+<div id="limit-status" class="alert alert-warning d-none" role="alert"></div>
+<div id="plan-status" class="alert alert-success d-none" role="alert"></div>
+
+<div class="card card-body py-2 mb-3">
+  <div class="d-flex gap-2 align-items-center flex-wrap">
+    <input type="text" class="form-control form-control-sm" style="max-width:260px"
+           id="plan-name" placeholder="Plan name"
+           value="{{ loaded_plan.name if loaded_plan else '' }}">
+    <button type="button" class="btn btn-secondary btn-sm" id="save-plan" disabled>
+      Save plan
+    </button>
+    <button type="button" class="btn btn-light border btn-sm d-none" id="save-plan-as">
+      Save as new
+    </button>
+
+    {% if plans %}
+    <select class="form-select form-select-sm ms-auto" style="max-width:260px"
+            id="load-plan">
+      <option value="">Load a saved plan…</option>
+      {% for plan in plans %}
+      <option value="{{ plan.id }}"
+              {% if loaded_plan and plan.id == loaded_plan.id %}selected{% endif %}>
+        {{ plan.name }}
+      </option>
+      {% endfor %}
+    </select>
+    <button type="button" class="btn btn-light border btn-sm" id="delete-plan"
+            {% if not loaded_plan %}disabled{% endif %}>Delete</button>
+    {% endif %}
+  </div>
+
+  {% if return_leg_id %}
+  <div class="small text-muted mt-2">
+    Planning for <a href="/legs/{{ return_leg_id }}">a leg</a> — save the plan,
+    then attach it there.
+  </div>
+  {% endif %}
+</div>
+
 <p class="text-muted small">
-  Click the map to drop waypoints. Drag a marker to adjust it, click a marker
-  to remove it. Courses are rhumb lines — a constant heading for the whole leg.
+  Click the map to drop waypoints. Drag a marker to move it, or click one to
+  name or delete it — names are what the helm reads. Courses are rhumb lines,
+  a constant heading for the whole leg.
 </p>
 
 <div id="passage-map"></div>
+
+<p class="text-muted small d-none" id="limit-legend">
+  <span style="display:inline-block;width:28px;border-top:3px dashed #ea580c;
+               vertical-align:middle"></span>
+  20 NM from the nearest shore, islands included — the seaward edge of the
+  limit. Pan to neighbouring waters and press <em>Add this area</em> to extend
+  the coverage. Purple lanes and zones on the chart are OpenSeaMap traffic
+  separation schemes, not this limit.
+</p>
 
 <div id="passage-empty" class="alert alert-light border text-muted">
   Click two points on the map to measure a passage.
@@ -74,6 +137,9 @@
 {% block scripts %}
 <script>
   const ETA_SPEEDS = {{ eta_speeds | tojson }};
+  const LOADED_PLAN_ID = {{ loaded_plan.id if loaded_plan else 'null' }};
+  const LOADED_WAYPOINTS = {{ loaded_waypoints | tojson }};
+  const RETURN_LEG_ID = {{ return_leg_id | tojson }};
 </script>
 <script src="/static/js/passage.js"></script>
 {% endblock %}

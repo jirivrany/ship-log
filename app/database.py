@@ -78,6 +78,12 @@ def migrate_schema(target_engine) -> None:
             elif "engine_power_hp" not in voyage_cols:
                 conn.exec_driver_sql("ALTER TABLE voyage ADD COLUMN engine_power_hp FLOAT")
 
+        # 2026-09: saved passage plans — link a leg to its planned route.
+        # The passageplan table itself needs no migration: create_all builds
+        # tables that do not exist yet and never alters ones that do.
+        if "passage_plan_id" not in cols:
+            conn.exec_driver_sql("ALTER TABLE leg ADD COLUMN passage_plan_id INTEGER")
+
         # 2026-07: weather enrichment — exact wind speed + provenance marker
         entry_cols = {row[1] for row in conn.exec_driver_sql("PRAGMA table_info(logentry)").fetchall()}
         if entry_cols:

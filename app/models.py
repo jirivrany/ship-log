@@ -103,6 +103,25 @@ class UserProfile(SQLModel, table=True):
     name: Optional[str] = None
 
 
+class PassagePlan(SQLModel, table=True):
+    """A named route measured in the planner, saved for reuse.
+
+    Only the waypoints are stored. Courses, distances and magnetic variation
+    are recomputed from them on every render by app/passage.py, so the numbers
+    shown can never drift from the geometry they describe.
+    """
+    id: Optional[int] = Field(default=None, primary_key=True)
+    name: str
+    # [{"lat": .., "lon": .., "name": ".."}, ...] in sailing order, as JSON —
+    # a waypoint has no identity of its own and is never queried separately.
+    waypoints: str
+    notes: Optional[str] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: Optional[datetime] = None
+
+    legs: list["Leg"] = Relationship(back_populates="passage_plan")
+
+
 class Leg(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     voyage_id: int = Field(foreign_key="voyage.id")
@@ -113,6 +132,10 @@ class Leg(SQLModel, table=True):
     track_path: Optional[str] = None          # source file on disk (FIT/GPX/Strava stream JSON)
     track_source: Optional[TrackSource] = None
     strava_activity_id: Optional[int] = None  # set for Strava imports; used for duplicate detection
+    # Planned route for this leg, drawn alongside the sailed track. A link
+    # rather than a copy: the same plan can serve legs sailed more than once.
+    passage_plan_id: Optional[int] = Field(default=None,
+                                           foreign_key="passageplan.id")
 
     # Forecast block (PDF: KWS "Předpověď počasí" page) — manually filled,
     # or prefilled by the forecast fetch (see forecast_source)
@@ -126,6 +149,7 @@ class Leg(SQLModel, table=True):
 
     voyage: Optional[Voyage] = Relationship(back_populates="legs")
     log_entries: list["LogEntry"] = Relationship(back_populates="leg")
+    passage_plan: Optional["PassagePlan"] = Relationship(back_populates="legs")
 
 
 class LogEntry(SQLModel, table=True):
